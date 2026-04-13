@@ -1,0 +1,3 @@
+node_modules/
+backend-nomina/node_modules/
+.env
