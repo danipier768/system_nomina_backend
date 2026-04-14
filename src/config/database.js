@@ -19,6 +19,21 @@ const pool = mysql.createPool({
 
 const promisePool = pool.promise()
 
+// Reconexión automática cuando Railway cierra la conexión
+pool.on('connection', (connection) => {
+  connection.on('error', (err) => {
+    if (err.fatal) console.warn('Conexión fatal perdida:', err.code);
+  });
+});
+
+// Keep-alive: evita que Railway cierre la conexión por inactividad
+setInterval(async () => {
+  try {
+    await promisePool.query('SELECT 1');
+  } catch (err) {
+    console.warn('Keep-alive falló:', err.message);
+  }
+}, 4 * 60 * 1000); // cada 4 minutos
 
 const DEFAULT_DEPARTMENTS = [
     'Gerencia General',
