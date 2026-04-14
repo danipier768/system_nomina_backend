@@ -1,4 +1,3 @@
-
 //database.js
 const mysql = require('mysql2');
 
@@ -11,13 +10,12 @@ const pool = mysql.createPool({
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0,
-
     enableKeepAlive: true,
     keepAliveInitialDelay: 10000,
     connectTimeout: 30000,
 });
 
-const promisePool = pool.promise()
+const promisePool = pool.promise();
 
 // Reconexión automática cuando Railway cierra la conexión
 pool.on('connection', (connection) => {
@@ -33,7 +31,34 @@ setInterval(async () => {
   } catch (err) {
     console.warn('Keep-alive falló:', err.message);
   }
-}, 4 * 60 * 1000); // cada 4 minutos
+}, 3 * 60 * 1000); // cada 3 minutos
+
+// ============================================
+// queryWithRetry: reintenta si la conexión fue
+// cerrada por Railway/Render tras inactividad.
+// ============================================
+const queryWithRetry = async (sql, params, retries = 3) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      return await promisePool.query(sql, params);
+    } catch (err) {
+      const isConnectionError = [
+        'PROTOCOL_CONNECTION_LOST',
+        'ECONNRESET',
+        'EPIPE',
+        'ETIMEDOUT',
+        'ENOTFOUND',
+      ].includes(err.code);
+
+      if (isConnectionError && i < retries - 1) {
+        console.warn(`Reintento DB ${i + 1}/${retries} (${err.code})...`);
+        await new Promise((r) => setTimeout(r, 600 * (i + 1)));
+        continue;
+      }
+      throw err;
+    }
+  }
+};
 
 const DEFAULT_DEPARTMENTS = [
     'Gerencia General',
@@ -80,7 +105,7 @@ const DEFAULT_DEPARTMENTS = [
 
 const ensureDefaultDepartments = async () => {
     try {
-        const [rows] = await promisePool.query(`SELECT nombre_departamento FROM departamentos`);
+        const [rows] = await queryWithRetry(`SELECT nombre_departamento FROM departamentos`);
         const existing = new Set(rows.map((row) => row.nombre_departamento.trim().toUpperCase()));
 
         const missing = DEFAULT_DEPARTMENTS.filter(
@@ -88,7 +113,7 @@ const ensureDefaultDepartments = async () => {
         );
 
         for (const department of missing) {
-            await promisePool.query(
+            await queryWithRetry(
                 `INSERT INTO departamentos (nombre_departamento) VALUES (?)`,
                 [department]
             );
@@ -106,7 +131,7 @@ const ensureDefaultDepartments = async () => {
 const ensureEmployeeSalaryColumn = async () => {
     try {
         const dbName = process.env.DB_NAME || 'sistema_nomina';
-        const [columns] = await promisePool.query(
+        const [columns] = await queryWithRetry(
             `SELECT COLUMN_NAME
              FROM INFORMATION_SCHEMA.COLUMNS
              WHERE TABLE_SCHEMA = ?
@@ -116,7 +141,7 @@ const ensureEmployeeSalaryColumn = async () => {
         );
 
         if (columns.length === 0) {
-            await promisePool.query(
+            await queryWithRetry(
                 `ALTER TABLE empleados
                  ADD COLUMN sueldo DECIMAL(12,2) NOT NULL DEFAULT 0.00
                  AFTER numero_identificacion`
@@ -129,11 +154,9 @@ const ensureEmployeeSalaryColumn = async () => {
     }
 };
 
-
-
 const ensurePayrollSupportTables = async () => {
     try {
-        await promisePool.query(`
+        await queryWithRetry(`
             CREATE TABLE IF NOT EXISTS horas_extra_nomina (
                 id_hora_extra INT(11) NOT NULL AUTO_INCREMENT,
                 id_nomina INT(11) NOT NULL,
@@ -157,7 +180,7 @@ const ensurePayrollSupportTables = async () => {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
         `);
 
-        await promisePool.query(`
+        await queryWithRetry(`
             CREATE TABLE IF NOT EXISTS reporte_nomina_mensual (
                 id_reporte INT(11) NOT NULL AUTO_INCREMENT,
                 anio SMALLINT NOT NULL,
@@ -183,10 +206,10 @@ const ensurePayrollSupportTables = async () => {
 
 const testConnection = async () => {
     try {
-        const [rows] = await promisePool.query('SELECT 1 + 1 AS resultado')
+        const [rows] = await queryWithRetry('SELECT 1 + 1 AS resultado');
         console.log('✅ Conexión a MySQL exitosa');
         console.log('📊 Base de datos:', process.env.DB_NAME);
-        return true
+        return true;
     } catch (error) {
         console.error('❌ Error al conectar a MySQL:', error.message);
         return false;
@@ -195,8 +218,9 @@ const testConnection = async () => {
 
 module.exports = {
     pool: promisePool,
+    queryWithRetry,
     testConnection,
     ensureEmployeeSalaryColumn,
     ensureDefaultDepartments,
     ensurePayrollSupportTables
-} 
+};
