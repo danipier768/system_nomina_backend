@@ -30,10 +30,8 @@ const PORT = process.env.PORT || 5000;
 // Permite que el frontend consuma la API del backend.
 app.use(
   cors({
-    origin: [
-      'http://localhost:5173',
-      'https://system-nomina-frontend-g5qk.vercel.app'
-    ],
+    origin:'https://system-nomina-frontend-g5qk.vercel.app',
+    methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
   })
 );
