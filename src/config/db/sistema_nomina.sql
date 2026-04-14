@@ -91,7 +91,7 @@ CREATE TABLE horas_extra_nomina (
     'EXTRA_NOCTURNA',
     'EXTRA_DIURNA_DOMINICAL_FESTIVO',
     'EXTRA_NOCTURNA_DOMINICAL_FESTIVO'
-  ) NOT NULL,
+  ) DEFAULT 'EXTRA_DIURNA' NOT NULL,
   porcentaje_recargo DECIMAL(5,2) NOT NULL,
   horas DECIMAL(8,2) NOT NULL,
   valor_hora_base DECIMAL(12,2) NOT NULL,
@@ -313,3 +313,26 @@ INSERT INTO password_reset_tokens
 (id_usuario, token, expira_en, usado) 
 VALUES
 (1, '220106', '2026-04-09 19:30:31', 1);
+
+
+CREATE TABLE password_reset_tokens (
+  id AUTO_INCREMENT PRIMARY KEY,
+  id_usuario int(11) NOT NULL,
+  token varchar(255) NOT NULL,
+  expira_en datetime NOT NULL,
+  usado tinyint(1) DEFAULT 0,
+  creado_en timestamp NOT NULL DEFAULT current_timestamp()
+) 
+
+CREATE TABLE reporte_nomina_mensual (
+  id_reporte int AUTO_INCREMENT PRIMARY KEY,
+  anio smallint(6) NOT NULL,
+  mes tinyint(4) NOT NULL,
+  total_nominas int(11) DEFAULT 0,
+  total_devengado decimal(14,2) DEFAULT 0.00,
+  total_deducciones decimal(14,2) DEFAULT 0.00,
+  total_pagado decimal(14,2) DEFAULT 0.00,
+  total_horas_extra decimal(12,2) DEFAULT 0.00,
+  valor_horas_extra decimal(14,2) DEFAULT 0.00,
+  actualizado_en timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+)
