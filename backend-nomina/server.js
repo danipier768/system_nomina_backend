@@ -55,7 +55,13 @@ app.get('/', (req, res) => {
 });
 
 app.get('/api/health', async (req, res) => {
-  const dbConnected = await testConnection();
+  let dbConnected = false;
+
+  try {
+    dbConnected = await testConnection();
+  } catch (err) {
+    console.warn('DB no conectada, pero el servidor sigue:', err.message);
+  }
 
   res.json({
     success: true,
@@ -108,10 +114,9 @@ const startServer = async () => {
 
     console.log('Probando conexion al servidor de email...');
     try {
-      console.log('Probando conexion al servidor de email...');
       await verifyConnection();
-    } catch (error) {
-      console.warn('No se pudo conectar al email:', error.message);
+    } catch (err) {
+      console.warn('Email no disponible:', err.message);
     }
 
     if (!dbConnected) {
@@ -127,13 +132,7 @@ const startServer = async () => {
     }
 
     app.listen(PORT, () => {
-      console.log('\n' + '='.repeat(50));
-      console.log('SERVIDOR INICIADO EXITOSAMENTE');
-      console.log('='.repeat(50));
-      console.log(`URL: http://localhost:${PORT}`);
-      console.log(`Entorno: ${process.env.NODE_ENV || 'development'}`);
-      console.log(`Base de datos: ${process.env.DB_NAME}`);
-      console.log('='.repeat(50) + '\n');
+      console.log(`Servidor iniciado en puerto ${PORT}`);
     });
   } catch (error) {
     console.error('Error al iniciar el servidor:', error.message);
