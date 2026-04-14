@@ -94,12 +94,12 @@ const login = async (req, res) => {
         id_empleado: user.id_empleado,
       },
     });
-  } catch (error) {
-    console.error("Error en login:", error);
+  } catch (err) {
+    console.error("Error en login:", err);
     res.status(500).json({
       success: false,
       succes: false,
-      message: `Error al iniciar sesion => ${error}`,
+      message: `Error al iniciar sesion => ${err}`,
     });
   }
 };
