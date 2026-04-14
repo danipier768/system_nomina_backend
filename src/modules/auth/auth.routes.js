@@ -20,8 +20,7 @@ router.post("/request-reset", requestPasswordReset);
 router.post("/reset-password", resetPassword);
 
 // Rutas protegidas para administracion y perfil.
-// router.post("/register", verifyToken, verifyAdminORRRHH, register);
-router.post('/register', register);
+router.post("/register", verifyToken, verifyAdminORRRHH, register);
 router.get("/profile", verifyToken, getProfile);
 
 // Ruta rapida para validar el montaje del modulo.
