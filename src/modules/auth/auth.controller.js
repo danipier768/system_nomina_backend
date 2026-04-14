@@ -99,7 +99,7 @@ const login = async (req, res) => {
     res.status(500).json({
       success: false,
       succes: false,
-      message: "Error al iniciar sesion =>" + error.message,
+      message: `Error al iniciar sesion => ${error.message}`,
     });
   }
 };
