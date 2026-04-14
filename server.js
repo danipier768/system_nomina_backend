@@ -16,7 +16,6 @@ const {
   ensurePayrollSupportTables
 } = require('./src/config/database.js');
 const { verifyConnection } = require('./src/services/emailService');
-
 const authRoutes = require('./src/modules/auth/auth.routes.js');
 const employeeRoutes = require('./src/modules/employees/employees.routes.js');
 const userRoutes = require('./src/modules/users/users.routes.js');

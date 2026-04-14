@@ -52,6 +52,8 @@ const login = async (req, res) => {
     }
 
     const user = users[0];
+    console.log(password); // la que escribes
+console.log(user.password); // la de la BD
 
     if (!user.activo) {
       return res.status(403).json({
