@@ -1,6 +1,6 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { pool } = require("../../config/database.js");
+const { pool, queryWithRetry } = require("../../config/database.js");
 const { sendPasswordResetEmail } = require("../../services/emailService");
 const {
   PASSWORD_MIN_LENGTH,
@@ -34,7 +34,7 @@ const login = async (req, res) => {
       });
     }
 
-    const [users] = await pool.query(
+    const [users] = await queryWithRetry(
       `SELECT u.id_usuario, u.username, u.password, u.email, u.activo,
               r.nombre_rol, u.id_empleado
         FROM usuarios u
