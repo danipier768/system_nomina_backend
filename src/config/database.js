@@ -127,6 +127,7 @@ const ensureDefaultDepartments = async () => {
         throw error;
     }
 };
+//holaa
 
 const ensureEmployeeSalaryColumn = async () => {
     try {
