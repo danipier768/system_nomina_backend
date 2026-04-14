@@ -110,7 +110,13 @@ app.use((err, req, res, next) => {
 const startServer = async () => {
   try {
     console.log('Probando conexion a la base de datos...');
-    const dbConnected = await testConnection();
+    let dbConnected = false;
+
+    try {
+      dbConnected = await testConnection();
+    } catch (err) {
+      console.warn('DB no conectada, pero el servidor sigue:', err.message);
+    }
 
     console.log('Probando conexion al servidor de email...');
     try {
