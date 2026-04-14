@@ -107,7 +107,12 @@ const startServer = async () => {
     const dbConnected = await testConnection();
 
     console.log('Probando conexion al servidor de email...');
-    await verifyConnection();
+    try {
+      console.log('Probando conexion al servidor de email...');
+      await verifyConnection();
+    } catch (error) {
+      console.warn('No se pudo conectar al email:', error.message);
+    }
 
     if (!dbConnected) {
       console.error('Advertencia: No se pudo conectar a la base de datos');
@@ -132,7 +137,7 @@ const startServer = async () => {
     });
   } catch (error) {
     console.error('Error al iniciar el servidor:', error.message);
-    process.exit(1);
+    console.log('El servidor continuará ejecutándose...');
   }
 };
 
