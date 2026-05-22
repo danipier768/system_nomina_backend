@@ -49,8 +49,10 @@ const getAllEmployees = async (req, res) => {
         e.tipo_identificacion,
         e.numero_identificacion,
         e.sueldo,
+        e.jornada_laboral,
         e.fecha_nacimiento,
         e.fecha_ingreso,
+        e.fecha_retiro,
         e.activo,
         c.nombre_cargo,
         d.nombre_departamento,
@@ -458,7 +460,7 @@ const updateEmployee = async (req, res) => {
 const deleteEmployee = async (req, res) => {
   try {
     const { id } = req.params;
-    const { permanent } = req.query; // ?permanent=true para eliminación permanente
+    const permanent = req.query.permanent === 'true'; // ?permanent=true para eliminación permanente
     const userRole = req.user.rol;
 
     // Verificar si el empleado existe
@@ -483,7 +485,7 @@ const deleteEmployee = async (req, res) => {
     }
 
     // ELIMINACIÓN PERMANENTE (Hard Delete) - Solo ADMINISTRADOR
-    if (permanent === 'true') {
+    if (permanent) {
       if (userRole !== 'ADMINISTRADOR') {
         return res.status(403).json({
           success: false,
@@ -536,10 +538,9 @@ const deleteEmployee = async (req, res) => {
     }
 
     // Desactivar empleado
-    await pool.query(
-      "UPDATE empleados SET activo = FALSE, eliminado_en = NOW() WHERE id_empleado = ?",
-      [id]
-    );
+    await pool.query("UPDATE empleados SET activo = FALSE, eliminado_en = NOW() WHERE id_empleado = ?", [
+      id,
+    ]);
 
     // Si tiene usuario asociado, también desactivarlo
     await pool.query(
@@ -576,9 +577,9 @@ const reactivateEmployee = async (req, res) => {
       });
     }
 
-    // Verificar si el empleado existe
+    // Verificar si el empleado existe y obtener su fecha de retiro
     const [existing] = await pool.query(
-      "SELECT id_empleado, activo FROM empleados WHERE id_empleado = ?",
+      "SELECT id_empleado, activo, fecha_retiro FROM empleados WHERE id_empleado = ?",
       [id]
     );
 
@@ -589,18 +590,69 @@ const reactivateEmployee = async (req, res) => {
       });
     }
 
+    const employee = existing[0];
+
     // Si ya está activo
-    if (existing[0].activo) {
+    if (employee.activo) {
       return res.status(400).json({
         success: false,
         message: "El empleado ya está activo",
       });
     }
 
+    // Verificar restriccion de tiempo de recontratacion
+    if (employee.fecha_retiro) {
+      const [paramRows] = await pool.query(
+        "SELECT meses_espera_recontratacion, dias_espera_recontratacion FROM parametros_nomina LIMIT 1"
+      );
+
+      if (paramRows.length > 0) {
+        const config = paramRows[0];
+        const mesesEspera = config.meses_espera_recontratacion;
+        const diasEspera = config.dias_espera_recontratacion;
+
+        if (mesesEspera > 0 || diasEspera > 0) {
+          const fechaRetiro = new Date(employee.fecha_retiro);
+          const hoy = new Date();
+
+          // Calcular fecha minima permitida
+          const fechaMinima = new Date(fechaRetiro);
+          fechaMinima.setMonth(fechaMinima.getMonth() + mesesEspera);
+          fechaMinima.setDate(fechaMinima.getDate() + diasEspera);
+
+          if (hoy < fechaMinima) {
+            const options = { year: 'numeric', month: 'long', day: 'numeric' };
+            const fechaFormateada = fechaMinima.toLocaleDateString('es-ES', options);
+            
+            return res.status(403).json({
+              success: false,
+              message: `No se puede reactivar al empleado. El tiempo de espera para recontratación no se ha cumplido. Podrá ser reactivado a partir del ${fechaFormateada}.`,
+            });
+          }
+        }
+      }
+    }
+
     // Reactivar empleado
+    const { fecha_reingreso } = req.body || {};
+    const nuevaFechaIngreso = fecha_reingreso || new Date();
+
     await pool.query(
-      "UPDATE empleados SET activo = TRUE, eliminado_en = NULL WHERE id_empleado = ?",
-      [id]
+      "UPDATE empleados SET activo = TRUE, eliminado_en = NULL, fecha_retiro = NULL, fecha_ingreso = ? WHERE id_empleado = ?",
+      [nuevaFechaIngreso, id]
+    );
+
+    // Resetear saldo de vacaciones para el año de reingreso
+    const yearReingreso = new Date(nuevaFechaIngreso).getFullYear();
+    await pool.query(
+      `INSERT INTO vacaciones_saldos
+        (id_empleado, periodo_anio, dias_ganados, dias_disfrutados, dias_pendientes)
+       VALUES (?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+        dias_ganados = VALUES(dias_ganados),
+        dias_disfrutados = VALUES(dias_disfrutados),
+        dias_pendientes = VALUES(dias_pendientes)`,
+      [id, yearReingreso, DEFAULT_VACATION_DAYS, 0, DEFAULT_VACATION_DAYS]
     );
 
     // Si tiene usuario asociado, también reactivarlo
@@ -686,6 +738,84 @@ const searchEmployees = async (req, res) => {
   }
 };
 
+const updateMyProfile = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = Number(req.user.id_empleado);
+    const targetId = Number(id);
+
+    if (!userId || userId !== targetId) {
+      return res.status(403).json({
+        success: false,
+        message: 'Solo puedes modificar tu propio perfil',
+      });
+    }
+
+    const { nombres, apellidos, tipo_identificacion, numero_identificacion, fecha_nacimiento } = req.body;
+
+    const [existing] = await pool.query(
+      `SELECT id_empleado FROM empleados WHERE id_empleado = ? AND activo = TRUE`,
+      [targetId]
+    );
+
+    if (existing.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Empleado no encontrado o inactivo',
+      });
+    }
+
+    if (numero_identificacion) {
+      const [duplicate] = await pool.query(
+        `SELECT id_empleado FROM empleados WHERE numero_identificacion = ? AND id_empleado != ?`,
+        [numero_identificacion, targetId]
+      );
+
+      if (duplicate.length > 0) {
+        return res.status(409).json({
+          success: false,
+          message: 'Ese numero de identificacion ya esta registrado',
+        });
+      }
+    }
+
+    await pool.query(
+      `UPDATE empleados
+       SET nombres = COALESCE(?, nombres),
+           apellidos = COALESCE(?, apellidos),
+           tipo_identificacion = COALESCE(?, tipo_identificacion),
+           numero_identificacion = COALESCE(?, numero_identificacion),
+           fecha_nacimiento = COALESCE(?, fecha_nacimiento)
+       WHERE id_empleado = ?`,
+      [nombres, apellidos, tipo_identificacion, numero_identificacion, fecha_nacimiento, targetId]
+    );
+
+    const [updated] = await pool.query(
+      `SELECT
+        e.id_empleado, e.nombres, e.apellidos, e.tipo_identificacion,
+        e.numero_identificacion, e.fecha_nacimiento, e.fecha_ingreso, e.sueldo,
+        c.nombre_cargo, d.nombre_departamento
+      FROM empleados e
+      LEFT JOIN cargos c ON e.id_cargo = c.id_cargo
+      LEFT JOIN departamentos d ON e.id_departamento = d.id_departamento
+      WHERE e.id_empleado = ?`,
+      [targetId]
+    );
+
+    return res.json({
+      success: true,
+      message: 'Perfil actualizado exitosamente',
+      data: updated[0],
+    });
+  } catch (error) {
+    console.error('Error en updateMyProfile:', error);
+    return res.status(500).json({
+      success: false,
+      message: 'Error al actualizar perfil',
+    });
+  }
+};
+
 module.exports = {
   getAllEmployees,
   getEmployeeById,
@@ -694,4 +824,5 @@ module.exports = {
   deleteEmployee,
   reactivateEmployee,
   searchEmployees,
+  updateMyProfile,
 };

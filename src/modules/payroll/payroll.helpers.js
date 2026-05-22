@@ -69,7 +69,7 @@ const getCommonDisabilitySegments = (requestRow) => {
 
 const normalizeSubtype = (subtype) => String(subtype || '').trim().toUpperCase();
 
-const mapRequestToPayrollNovelty = (requestRow, monthlySalary) => {
+const mapRequestToPayrollNoveltyRows = (requestRow, monthlySalary, subsidioTransporte = 0, topeSubsidioTransporte = 0) => {
   const overlappingDays = calculateOverlappingDays(
     requestRow.periodo_inicio,
     requestRow.periodo_fin,
@@ -85,7 +85,7 @@ const mapRequestToPayrollNovelty = (requestRow, monthlySalary) => {
   const normalizedSubtype = normalizeSubtype(requestRow.sub_tipo);
 
   if (overlappingDays <= 0 && requestedHours <= 0) {
-    return null;
+    return [];
   }
 
   let concept = '';
@@ -97,16 +97,83 @@ const mapRequestToPayrollNovelty = (requestRow, monthlySalary) => {
   const unpaidFactor = 1 - paidFactor;
 
   if (requestRow.tipo === 'VACACIONES') {
-    if (paidFactor >= 1) {
-      concept = `Adicion vacaciones remuneradas (${overlappingDays} dias)`;
-      category = 'DEVENGADO';
-      amount = Number(fullDaysValue.toFixed(2));
-    } else {
-      const deductionAmount = fullDaysValue * unpaidFactor;
-      concept = `Deduccion vacaciones (${overlappingDays} dias)`;
-      category = deductionAmount > 0 ? 'DEDUCCION' : 'INFORMATIVA';
-      amount = Number(deductionAmount.toFixed(2));
+    const tieneSubsidio = monthlySalary < topeSubsidioTransporte && subsidioTransporte > 0;
+    const transportDailyValue = tieneSubsidio ? subsidioTransporte / 30 : 0;
+    
+    // Si existen los campos de división, los usamos. 
+    // Si no, asumimos que todos los dias solicitados son para disfrutar (compatibilidad hacia atras).
+    const dDisfrutar = Number(requestRow.dias_disfrutar || 0);
+    const dDinero = Number(requestRow.dias_dinero || 0);
+    const hasSplitData = (dDisfrutar + dDinero) > 0;
+
+    // Los días que efectivamente se ausenta para la nómina actual son los que se cruzan con el periodo y son "a disfrutar".
+    // Si no tiene split data, usamos el cálculo tradicional basado en overlappingDays.
+    const effectiveEnjoyedDays = hasSplitData ? Math.min(overlappingDays, dDisfrutar) : overlappingDays;
+    
+    const results = [];
+
+    if (effectiveEnjoyedDays > 0) {
+      const transportDeduction = Number((transportDailyValue * effectiveEnjoyedDays).toFixed(2));
+
+      results.push(
+        {
+          id_solicitud: requestRow.id_solicitud,
+          tipo: requestRow.tipo,
+          sub_tipo: requestRow.sub_tipo,
+          fecha_inicio: requestRow.fecha_inicio,
+          fecha_fin: requestRow.fecha_fin,
+          cantidad: effectiveEnjoyedDays,
+          unidad: 'DIAS',
+          porcentaje_pago: paymentPercentage,
+          es_remunerado: Number(requestRow.es_remunerado) === 1,
+          origen_novedad: requestRow.origen_novedad,
+          categoria: 'INFORMATIVA',
+          concepto: `Vacaciones disfrutadas (${effectiveEnjoyedDays} dias)`,
+          valor: 0
+        },
+        {
+          id_solicitud: requestRow.id_solicitud,
+          tipo: requestRow.tipo,
+          sub_tipo: requestRow.sub_tipo,
+          fecha_inicio: requestRow.fecha_inicio,
+          fecha_fin: requestRow.fecha_fin,
+          cantidad: effectiveEnjoyedDays,
+          unidad: 'DIAS',
+          porcentaje_pago: paymentPercentage,
+          es_remunerado: Number(requestRow.es_remunerado) === 1,
+          origen_novedad: requestRow.origen_novedad,
+          categoria: transportDeduction > 0 ? 'DEDUCCION' : 'INFORMATIVA',
+          concepto: `Descuento subsidio transporte por vacaciones (${effectiveEnjoyedDays} dias)`,
+          valor: transportDeduction
+        }
+      );
     }
+
+    // El pago en dinero se realiza una sola vez (usualmente en el primer periodo que toque la fecha de inicio).
+    // Para simplificar, si hay dDinero y estamos en el periodo de inicio, lo pagamos.
+    const isPeriodOfStart = new Date(requestRow.fecha_inicio) >= new Date(requestRow.periodo_inicio) && 
+                           new Date(requestRow.fecha_inicio) <= new Date(requestRow.periodo_fin);
+
+    if (dDinero > 0 && isPeriodOfStart) {
+      const vacationMoneyValue = Number((dailySalary * dDinero).toFixed(2));
+      results.push({
+        id_solicitud: requestRow.id_solicitud,
+        tipo: requestRow.tipo,
+        sub_tipo: requestRow.sub_tipo,
+        fecha_inicio: requestRow.fecha_inicio,
+        fecha_fin: requestRow.fecha_fin,
+        cantidad: dDinero,
+        unidad: 'DIAS',
+        porcentaje_pago: paymentPercentage,
+        es_remunerado: true,
+        origen_novedad: requestRow.origen_novedad,
+        categoria: 'DEVENGADO',
+        concepto: `Compensacion vacaciones en dinero (${dDinero} dias)`,
+        valor: vacationMoneyValue
+      });
+    }
+
+    return results;
   } else if (requestRow.tipo === 'PERMISO') {
     if (requestedHours > 0) {
       quantity = requestedHours;
@@ -132,10 +199,9 @@ const mapRequestToPayrollNovelty = (requestRow, monthlySalary) => {
     }
   } else if (requestRow.tipo === 'INCAPACIDAD') {
     if (String(requestRow.origen_novedad || 'COMUN').toUpperCase() === 'LABORAL') {
-      const deductionAmount = fullDaysValue * unpaidFactor;
-      concept = `Ajuste incapacidad laboral (${overlappingDays} dias)`;
-      category = deductionAmount > 0 ? 'DEDUCCION' : 'INFORMATIVA';
-      amount = Number(deductionAmount.toFixed(2));
+      concept = `Incapacidad laboral pagada (${overlappingDays} dias)`;
+      category = 'INFORMATIVA';
+      amount = 0;
     } else {
       const segments = getCommonDisabilitySegments(requestRow);
       const deductionAmount =
@@ -148,9 +214,9 @@ const mapRequestToPayrollNovelty = (requestRow, monthlySalary) => {
     }
   } else if (requestRow.tipo === 'LICENCIA') {
     if (normalizedSubtype === 'MATERNIDAD' || normalizedSubtype === 'PATERNIDAD') {
-      concept = `Adicion licencia ${normalizedSubtype.toLowerCase()} (${overlappingDays} dias)`;
-      category = 'DEVENGADO';
-      amount = Number(fullDaysValue.toFixed(2));
+      concept = `Licencia ${normalizedSubtype.toLowerCase()} pagada (${overlappingDays} dias)`;
+      category = 'INFORMATIVA';
+      amount = 0;
     } else if (Number(requestRow.es_remunerado) === 1) {
       const deductionAmount = fullDaysValue * unpaidFactor;
       concept = `Ajuste licencia remunerada (${overlappingDays} dias)`;
@@ -163,7 +229,7 @@ const mapRequestToPayrollNovelty = (requestRow, monthlySalary) => {
     }
   }
 
-  return {
+  return [{
     id_solicitud: requestRow.id_solicitud,
     tipo: requestRow.tipo,
     sub_tipo: requestRow.sub_tipo,
@@ -177,7 +243,7 @@ const mapRequestToPayrollNovelty = (requestRow, monthlySalary) => {
     categoria: category,
     concepto: concept,
     valor: amount
-  };
+  }];
 };
 
 const buildPayrollNoveltyDetailRows = (idNomina, novelties) => (
@@ -186,23 +252,8 @@ const buildPayrollNoveltyDetailRows = (idNomina, novelties) => (
     .map((novelty) => [idNomina, String(novelty.concepto).slice(0, 100), Number(novelty.valor)])
 );
 
-const buildAppliedNoveltyRows = (idNomina, novelties) => (
-  novelties
-    .filter((novelty) => novelty && novelty.id_solicitud && novelty.concepto)
-    .map((novelty) => [
-      idNomina,
-      novelty.id_solicitud,
-      novelty.categoria || 'INFORMATIVA',
-      String(novelty.concepto).slice(0, 120),
-      Number(novelty.cantidad) || 0,
-      novelty.unidad === 'HORAS' ? 'HORAS' : 'DIAS',
-      Number(novelty.porcentaje_pago) || 0,
-      Number(novelty.valor) || 0
-    ])
-);
-
-const getPayrollNoveltiesForPeriod = async ({ db, idEmpleado, fechaInicio, fechaCorte }) => {
-  const [employeeRows] = await db.query(
+const getPayrollNoveltiesForPeriod = async ({ pool, idEmpleado, fechaInicio, fechaCorte, subsidioTransporte = 0, topeSubsidioTransporte = 0 }) => {
+  const [employeeRows] = await pool.query(
     `SELECT id_empleado, nombres, apellidos, sueldo
      FROM empleados
      WHERE id_empleado = ?
@@ -217,7 +268,7 @@ const getPayrollNoveltiesForPeriod = async ({ db, idEmpleado, fechaInicio, fecha
   const employee = employeeRows[0];
   const monthlySalary = Number(employee.sueldo) || 0;
 
-  const [requestRows] = await db.query(
+  const [requestRows] = await pool.query(
     `SELECT
       s.id_solicitud,
       s.id_empleado,
@@ -226,6 +277,8 @@ const getPayrollNoveltiesForPeriod = async ({ db, idEmpleado, fechaInicio, fecha
       s.fecha_inicio,
       s.fecha_fin,
       s.dias_solicitados,
+      s.dias_disfrutar,
+      s.dias_dinero,
       s.horas_solicitadas,
       s.es_remunerado,
       s.porcentaje_pago,
@@ -233,21 +286,15 @@ const getPayrollNoveltiesForPeriod = async ({ db, idEmpleado, fechaInicio, fecha
       ? AS periodo_inicio,
       ? AS periodo_fin
     FROM solicitudes_laborales s
-    LEFT JOIN nomina_novedades_aplicadas nna ON nna.id_solicitud = s.id_solicitud
     WHERE s.id_empleado = ?
       AND s.estado = ?
-      AND s.pendiente_liquidacion = 1
-      AND s.liquidada_en_nomina = 0
-      AND nna.id_solicitud IS NULL
       AND s.fecha_inicio <= ?
       AND s.fecha_fin >= ?
     ORDER BY s.fecha_inicio ASC, s.id_solicitud ASC`,
     [fechaInicio, fechaCorte, idEmpleado, APPROVED_STATUS, fechaCorte, fechaInicio]
   );
 
-  const novelties = requestRows
-    .map((row) => mapRequestToPayrollNovelty(row, monthlySalary))
-    .filter(Boolean);
+  const novelties = requestRows.flatMap((row) => mapRequestToPayrollNoveltyRows(row, monthlySalary, subsidioTransporte, topeSubsidioTransporte));
 
   const summary = novelties.reduce((acc, novelty) => {
     if (novelty.categoria === 'DEVENGADO') {
@@ -283,8 +330,7 @@ module.exports = {
   getOverlappingDateRange,
   getCommonDisabilitySegments,
   normalizeSubtype,
-  mapRequestToPayrollNovelty,
+  mapRequestToPayrollNoveltyRows,
   buildPayrollNoveltyDetailRows,
-  buildAppliedNoveltyRows,
   getPayrollNoveltiesForPeriod
 };

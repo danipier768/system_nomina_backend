@@ -9,6 +9,7 @@ const {
   deleteEmployee,
   reactivateEmployee,
   searchEmployees,
+  updateMyProfile,
 } = require("./employees.controller");
 
 const {
@@ -29,5 +30,8 @@ router.post("/", verifyAdminORRRHH, createEmployee);
 router.put("/:id", verifyAdminORRRHH, updateEmployee);
 router.put("/:id/reactivate", verifyAdminORRRHH, reactivateEmployee);
 router.delete("/:id", verifyAdminORRRHH, deleteEmployee);
+
+// Actualizacion de perfil para el propio empleado.
+router.put("/:id/profile", updateMyProfile);
 
 module.exports = router;

@@ -36,6 +36,7 @@ CREATE TABLE empleados (
   id_cargo INT,
   id_departamento INT,
   activo BOOLEAN DEFAULT TRUE,
+  fecha_retiro DATE NULL,
   eliminado_en TIMESTAMP NULL,
   FOREIGN KEY (id_cargo) REFERENCES cargos(id_cargo),
   FOREIGN KEY (id_departamento) REFERENCES departamentos(id_departamento)
@@ -91,7 +92,7 @@ CREATE TABLE horas_extra_nomina (
     'EXTRA_NOCTURNA',
     'EXTRA_DIURNA_DOMINICAL_FESTIVO',
     'EXTRA_NOCTURNA_DOMINICAL_FESTIVO'
-  ) DEFAULT 'EXTRA_DIURNA' NOT NULL,
+  ) NOT NULL,
   porcentaje_recargo DECIMAL(5,2) NOT NULL,
   horas DECIMAL(8,2) NOT NULL,
   valor_hora_base DECIMAL(12,2) NOT NULL,
@@ -99,6 +100,29 @@ CREATE TABLE horas_extra_nomina (
   valor_total DECIMAL(12,2) NOT NULL,
   creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (id_nomina) REFERENCES nomina(id_nomina) ON DELETE CASCADE
+);
+
+CREATE TABLE parametros_nomina (
+  id_parametro INT AUTO_INCREMENT PRIMARY KEY,
+  horas_extra_ordinaria_pct DECIMAL(5,2) NOT NULL DEFAULT 25.00,
+  horas_extra_nocturna_pct DECIMAL(5,2) NOT NULL DEFAULT 75.00,
+  horas_extra_festiva_pct DECIMAL(5,2) NOT NULL DEFAULT 100.00,
+  horas_extra_festiva_nocturna_pct DECIMAL(5,2) NOT NULL DEFAULT 150.00,
+  subsidio_transporte DECIMAL(12,2) NOT NULL DEFAULT 140606.00,
+  tope_subsidio_transporte DECIMAL(12,2) NOT NULL DEFAULT 3501810.00,
+  horas_semanales DECIMAL(6,2) NOT NULL DEFAULT 47.00,
+  salud_empleado_pct DECIMAL(5,3) NOT NULL DEFAULT 4.000,
+  salud_empresa_pct DECIMAL(5,3) NOT NULL DEFAULT 8.500,
+  pension_empleado_pct DECIMAL(5,3) NOT NULL DEFAULT 4.000,
+  pension_empresa_pct DECIMAL(5,3) NOT NULL DEFAULT 12.000,
+  arl_empresa_pct DECIMAL(5,3) NOT NULL DEFAULT 0.522,
+  sena_pct DECIMAL(5,3) NOT NULL DEFAULT 2.000,
+  icbf_pct DECIMAL(5,3) NOT NULL DEFAULT 3.000,
+  caja_compensacion_pct DECIMAL(5,3) NOT NULL DEFAULT 4.000,
+  actualizado_por INT NULL,
+  creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (actualizado_por) REFERENCES usuarios(id_usuario) ON DELETE SET NULL
 );
 
 -- =====================
@@ -137,10 +161,6 @@ CREATE TABLE solicitudes_laborales (
   comentario_empleado TEXT,
   comentario_aprobador TEXT,
   documento_soporte VARCHAR(255),
-  impacto_nomina_calculado JSON NULL,
-  pendiente_liquidacion TINYINT(1) NOT NULL DEFAULT 0,
-  liquidada_en_nomina TINYINT(1) NOT NULL DEFAULT 0,
-  fecha_liquidacion TIMESTAMP NULL,
   fecha_solicitud TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   fecha_respuesta TIMESTAMP NULL,
   aprobado_por INT,
@@ -172,6 +192,50 @@ CREATE TABLE nomina_novedades_aplicadas (
   FOREIGN KEY (id_nomina) REFERENCES nomina(id_nomina) ON DELETE CASCADE,
   FOREIGN KEY (id_solicitud) REFERENCES solicitudes_laborales(id_solicitud) ON DELETE CASCADE
 );
+
+-- =====================
+-- REPORTES
+-- =====================
+
+CREATE TABLE reporte_nomina_mensual (
+  id_reporte INT AUTO_INCREMENT PRIMARY KEY,
+  anio SMALLINT NOT NULL,
+  mes TINYINT NOT NULL,
+  total_nominas INT DEFAULT 0,
+  total_devengado DECIMAL(14,2) DEFAULT 0.00,
+  total_deducciones DECIMAL(14,2) DEFAULT 0.00,
+  total_pagado DECIMAL(14,2) DEFAULT 0.00,
+  total_horas_extra DECIMAL(12,2) DEFAULT 0.00,
+  valor_horas_extra DECIMAL(14,2) DEFAULT 0.00,
+  actualizado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE (anio, mes)
+);
+
+-- =====================
+-- TOKENS
+-- =====================
+
+CREATE TABLE password_reset_tokens (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  id_usuario INT NOT NULL,
+  token VARCHAR(255) UNIQUE NOT NULL,
+  expira_en DATETIME NOT NULL,
+  usado TINYINT(1) DEFAULT 0,
+  creado_en TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (id_usuario) REFERENCES usuarios(id_usuario) ON DELETE CASCADE
+);
+
+-- =====================
+-- INSERTS
+-- =====================
+
+INSERT INTO cargos (nombre_cargo) VALUES
+('Analista'),('Desarrollador'),('Soporte Técnico'),('Gerente'),('Asistente');
+
+INSERT INTO roles (nombre_rol) VALUES
+('ADMINISTRADOR'),('RRHH'),('EMPLEADO');
+
+
 -- =====================
 -- CARGOS
 -- =====================
@@ -281,6 +345,14 @@ VALUES
 (1, 'EXTRA_DIURNA', 25.00, 5.00, 10000.00, 12500.00, 62500.00);
 
 -- =====================
+-- PARAMETROS NOMINA
+-- =====================
+INSERT INTO parametros_nomina
+(horas_extra_ordinaria_pct, horas_extra_nocturna_pct, horas_extra_festiva_pct, horas_extra_festiva_nocturna_pct, subsidio_transporte, horas_semanales, salud_empleado_pct, salud_empresa_pct, pension_empleado_pct, pension_empresa_pct, arl_empresa_pct, actualizado_por)
+VALUES
+(25.00, 75.00, 100.00, 150.00, 140606.00, 47.00, 4.000, 8.500, 4.000, 12.000, 0.522, 1);
+
+-- =====================
 -- VACACIONES
 -- =====================
 INSERT INTO vacaciones_saldos 
@@ -312,27 +384,4 @@ VALUES
 INSERT INTO password_reset_tokens 
 (id_usuario, token, expira_en, usado) 
 VALUES
-(1, '220106', '2026-04-09 19:30:31', 1);
-
-
-CREATE TABLE password_reset_tokens (
-  id AUTO_INCREMENT PRIMARY KEY,
-  id_usuario int(11) NOT NULL,
-  token varchar(255) NOT NULL,
-  expira_en datetime NOT NULL,
-  usado tinyint(1) DEFAULT 0,
-  creado_en timestamp NOT NULL DEFAULT current_timestamp()
-) 
-
-CREATE TABLE reporte_nomina_mensual (
-  id_reporte int AUTO_INCREMENT PRIMARY KEY,
-  anio smallint(6) NOT NULL,
-  mes tinyint(4) NOT NULL,
-  total_nominas int(11) DEFAULT 0,
-  total_devengado decimal(14,2) DEFAULT 0.00,
-  total_deducciones decimal(14,2) DEFAULT 0.00,
-  total_pagado decimal(14,2) DEFAULT 0.00,
-  total_horas_extra decimal(12,2) DEFAULT 0.00,
-  valor_horas_extra decimal(14,2) DEFAULT 0.00,
-  actualizado_en timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
-)
+(1, 3, '220106', '2026-04-09 19:30:31', 1);

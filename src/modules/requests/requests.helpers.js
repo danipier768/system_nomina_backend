@@ -193,28 +193,6 @@ const saveSupportFile = async ({ supportFile, requestType, employeeId }) => {
   return `/uploads/solicitudes/${fileName}`;
 };
 
-const buildApprovalPayrollSnapshot = ({ requestRow }) => {
-  const totalDays = Number(requestRow.dias_solicitados) || 0;
-  const totalHours = Number(requestRow.horas_solicitadas) || 0;
-  const percentage = Number(requestRow.porcentaje_pago) || 0;
-  const isRemunerated = Number(requestRow.es_remunerado) === 1;
-  const unit = totalHours > 0 ? 'HORAS' : 'DIAS';
-  const quantity = totalHours > 0 ? totalHours : totalDays;
-  const unpaidPercentage = Number((100 - percentage).toFixed(2));
-
-  return {
-    tipo: requestRow.tipo,
-    sub_tipo: requestRow.sub_tipo,
-    origen_novedad: requestRow.origen_novedad,
-    unidad: unit,
-    cantidad: quantity,
-    es_remunerado: isRemunerated,
-    porcentaje_pago: percentage,
-    porcentaje_deduccion_estimado: unpaidPercentage < 0 ? 0 : unpaidPercentage,
-    generado_en: new Date().toISOString()
-  };
-};
-
 module.exports = {
   createHttpError,
   calculateRequestedDays,
@@ -223,6 +201,5 @@ module.exports = {
   getAutomaticPayrollImpactDataForEmployee,
   validatePayrollImpactData,
   getEmployeeIdForRequest,
-  saveSupportFile,
-  buildApprovalPayrollSnapshot
+  saveSupportFile
 };

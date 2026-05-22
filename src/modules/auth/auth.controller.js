@@ -1,23 +1,10 @@
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { pool, queryWithRetry } = require("../../config/database.js");
+const { pool } = require("../../config/database.js");
 const { sendPasswordResetEmail } = require("../../services/emailService");
-const {
-  PASSWORD_MIN_LENGTH,
-  JWT_EXPIRES_IN,
-} = require("./auth.constants");
-const {
-  isValidEmail,
-  generatePasswordResetToken,
-  buildPasswordResetExpiration,
-} = require("./auth.helpers");
-const {
-  validateEmail,
-  validatePassword,
-  validatePasswordMatch,
-  validateLoginInput,
-  validateResetToken,
-} = require("../../utils/validators");
+const {PASSWORD_MIN_LENGTH, JWT_EXPIRES_IN} = require("./auth.constants");
+const {isValidEmail, generatePasswordResetToken, buildPasswordResetExpiration} = require("./auth.helpers");
+const {validateEmail, validatePassword, validatePasswordMatch, validateLoginInput,validateResetToken} = require("../../utils/validators");
 
 // Inicia sesion y devuelve el token JWT junto con el usuario autenticado.
 const login = async (req, res) => {
@@ -29,12 +16,11 @@ const login = async (req, res) => {
     if (!loginValidation.isValid) {
       return res.status(400).json({
         success: false,
-        succes: false,
         message: loginValidation.error,
       });
     }
 
-    const [users] = await queryWithRetry(
+    const [users] = await pool.query(
       `SELECT u.id_usuario, u.username, u.password, u.email, u.activo,
               r.nombre_rol, u.id_empleado
         FROM usuarios u
@@ -46,19 +32,15 @@ const login = async (req, res) => {
     if (users.length === 0) {
       return res.status(401).json({
         success: false,
-        succes: false,
         message: "Usuario o contrasena incorrectos",
       });
     }
 
     const user = users[0];
-    console.log(password); // la que escribes
-console.log(user.password); // la de la BD
 
     if (!user.activo) {
       return res.status(403).json({
         success: false,
-        succes: false,
         message: "Tu cuenta esta desactivada contacta con el administrador",
       });
     }
@@ -68,7 +50,6 @@ console.log(user.password); // la de la BD
     if (!passwordMatch) {
       return res.status(401).json({
         success: false,
-        succes: false,
         message: "Usuario o contrasena incorrectos",
       });
     }
@@ -85,7 +66,7 @@ console.log(user.password); // la de la BD
 
     res.json({
       success: true,
-      succes: true,
+
       message: "Login exitoso",
       token,
       user: {
@@ -96,12 +77,11 @@ console.log(user.password); // la de la BD
         id_empleado: user.id_empleado,
       },
     });
-  } catch (err) {
-    console.error("Error en login:", err);
+  } catch (error) {
+    console.error("Error en login:", error);
     res.status(500).json({
       success: false,
-      succes: false,
-      message: `Error al iniciar sesion => ${err}`,
+      message: "Error al iniciar sesion",
     });
   }
 };
@@ -114,7 +94,6 @@ const register = async (req, res) => {
     if (!username || !password || !email || !rol) {
       return res.status(400).json({
         success: false,
-        succes: false,
         message: "Por favor completa todos los datos requeridos",
       });
     }
@@ -122,7 +101,6 @@ const register = async (req, res) => {
     if (!isValidEmail(email)) {
       return res.status(400).json({
         success: false,
-        succes: false,
         message: "Email invalido",
       });
     }
@@ -130,7 +108,6 @@ const register = async (req, res) => {
     if (password.length < PASSWORD_MIN_LENGTH) {
       return res.status(400).json({
         success: false,
-        succes: false,
         message: `La contrasena debe tener al menos ${PASSWORD_MIN_LENGTH} caracteres`,
       });
     }
@@ -143,7 +120,6 @@ const register = async (req, res) => {
     if (existingUsers.length > 0) {
       return res.status(409).json({
         success: false,
-        succes: false,
         message: "El usuario o el email ya existe",
       });
     }
@@ -156,7 +132,6 @@ const register = async (req, res) => {
     if (roles.length === 0) {
       return res.status(400).json({
         success: false,
-        succes: false,
         message: "Rol invalido",
       });
     }
@@ -171,7 +146,7 @@ const register = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      succes: true,
+
       message: "Usuario registrado correctamente",
       user: {
         id_usuario: result.insertId,
@@ -184,7 +159,6 @@ const register = async (req, res) => {
     console.error("Error al registrar:", error);
     res.status(500).json({
       success: false,
-      succes: false,
       message: "Error al registrar usuario",
     });
   }
@@ -273,7 +247,6 @@ const resetPassword = async (req, res) => {
     if (!email || !token || !newPassword) {
       return res.status(400).json({
         success: false,
-        succes: false,
         message: "Por favor completa todos los campos",
       });
     }
@@ -283,7 +256,6 @@ const resetPassword = async (req, res) => {
     if (!emailValidation.isValid) {
       return res.status(400).json({
         success: false,
-        succes: false,
         message: `Email: ${emailValidation.error}`,
       });
     }
@@ -293,7 +265,6 @@ const resetPassword = async (req, res) => {
     if (!tokenValidation.isValid) {
       return res.status(400).json({
         success: false,
-        succes: false,
         message: tokenValidation.error,
       });
     }
@@ -303,7 +274,6 @@ const resetPassword = async (req, res) => {
     if (!newPasswordValidation.isValid) {
       return res.status(400).json({
         success: false,
-        succes: false,
         message: `Contraseña: ${newPasswordValidation.error}`,
       });
     }
@@ -314,8 +284,7 @@ const resetPassword = async (req, res) => {
       if (!matchValidation.isValid) {
         return res.status(400).json({
           success: false,
-          succes: false,
-          message: `Contraseña: ${matchValidation.error}`,
+            message: `Contraseña: ${matchValidation.error}`,
         });
       }
     }
@@ -328,7 +297,6 @@ const resetPassword = async (req, res) => {
     if (users.length === 0) {
       return res.status(404).json({
         success: false,
-        succes: false,
         message: "Usuario no encontrado",
       });
     }
@@ -347,7 +315,6 @@ const resetPassword = async (req, res) => {
     if (tokens.length === 0) {
       return res.status(400).json({
         success: false,
-        succes: false,
         message: "Token invalido",
       });
     }
@@ -382,7 +349,7 @@ const resetPassword = async (req, res) => {
 
     res.json({
       success: true,
-      succes: true,
+
       message: "Contrasena actualizada exitosamente",
     });
   } catch (error) {
@@ -415,14 +382,13 @@ const getProfile = async (req, res) => {
     if (users.length === 0) {
       return res.status(404).json({
         success: false,
-        succes: false,
         message: "Usuario no encontrado",
       });
     }
 
     res.json({
       success: true,
-      succes: true,
+
       user: users[0],
     });
   } catch (error) {

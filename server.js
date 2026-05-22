@@ -12,56 +12,59 @@ const path = require('path');
 const {
   testConnection,
   ensureEmployeeSalaryColumn,
+  ensureEmployeeWithdrawalColumn,
   ensureDefaultDepartments,
-  ensurePayrollSupportTables
+  ensurePayrollSupportTables,
+  ensurePrestacionesLiquidacionTables,
+  ensureRehiringParameters,
+  ensureJornadaLaboralColumn,
+  ensureGlobalJornadaLaboralColumn,
+  ensureNominaStatusColumn
 } = require('./src/config/database.js');
 const { verifyConnection } = require('./src/services/emailService');
+
 const authRoutes = require('./src/modules/auth/auth.routes.js');
 const employeeRoutes = require('./src/modules/employees/employees.routes.js');
 const userRoutes = require('./src/modules/users/users.routes.js');
 const catalogRoutes = require('./src/modules/catalogs/catalogs.routes.js');
 const nominaRoutes = require('./src/modules/payroll/payroll.routes.js');
 const solicitudesRoutes = require('./src/modules/requests/requests.routes.js');
+const prestacionesRoutes = require('./src/modules/prestaciones/prestaciones.routes.js');
+const liquidacionRoutes = require('./src/modules/liquidacion/liquidacion.routes.js');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
 // Permite que el frontend consuma la API del backend.
-app.use(
-  cors({
-    origin:'https://system-nomina-frontend-g5qk.vercel.app',
-    methods: ['GET', 'POST', 'PUT', 'DELETE'],
-    credentials: true
-  })
-);
+app.use(cors({
+  origin: [
+    'https://system-payroll.vercel.app',
+    'https://system-nomina-dsv.vercel.app'
+  ],
+  credentials: true
+}));
 
 // Se usa un limite amplio porque los soportes viajan en base64 y pesan mas.
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
-// Logger basico para ver cada peticion que entra al servidor.
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path} - ${new Date().toLocaleDateString()}`);
+  if (process.env.NODE_ENV === 'development') {
+    console.log(`${req.method} ${req.path}`);
+  }
   next();
 });
 
 app.get('/', (req, res) => {
   res.json({
     success: true,
-    succes: true,
     message: 'Servidor funcionando correctamente',
     timestamp: new Date().toISOString()
   });
 });
 
 app.get('/api/health', async (req, res) => {
-  let dbConnected = false;
-
-  try {
-    dbConnected = await testConnection();
-  } catch (err) {
-    console.warn('DB no conectada, pero el servidor sigue:', err.message);
-  }
+  const dbConnected = await testConnection();
 
   res.json({
     success: true,
@@ -80,18 +83,13 @@ app.use('/api/users', userRoutes);
 app.use('/api/catalogs', catalogRoutes);
 app.use('/api/nomina', nominaRoutes);
 app.use('/api/solicitudes', solicitudesRoutes);
+app.use('/api/prestaciones', prestacionesRoutes);
+app.use('/api/liquidacion', liquidacionRoutes);
 
-app.use((req, res) => {
-  res.status(404).json({
-    success: false,
-    succes: false,
-    message: 'Ruta no encontrada'
-  });
-});
-
-// Captura errores globales y da un mensaje claro cuando el body supera el limite.
 app.use((err, req, res, next) => {
-  console.error('Error:', err.stack);
+  if (process.env.NODE_ENV === 'development') {
+    console.error('Error:', err.stack);
+  }
 
   if (err.type === 'entity.too.large') {
     return res.status(413).json({
@@ -107,46 +105,53 @@ app.use((err, req, res, next) => {
   });
 });
 
-const startServer = async () => {
+const initializeApp = async () => {
   try {
     console.log('Probando conexion a la base de datos...');
-    let dbConnected = false;
-
-    try {
-      dbConnected = await testConnection();
-    } catch (err) {
-      console.warn('DB no conectada, pero el servidor sigue:', err.message);
-    }
+    const dbConnected = await testConnection();
 
     console.log('Probando conexion al servidor de email...');
-    try {
-      await verifyConnection();
-    } catch (err) {
-      console.warn('Email no disponible:', err.message);
-    }
+    await verifyConnection();
 
     if (!dbConnected) {
       console.error('Advertencia: No se pudo conectar a la base de datos');
-      console.log('Verifica tu archivo .env y que MySQL este corriendo');
     }
 
     if (dbConnected) {
       console.log('Verificando migraciones minimas de base de datos...');
       await ensureEmployeeSalaryColumn();
+      await ensureEmployeeWithdrawalColumn();
       await ensureDefaultDepartments();
       await ensurePayrollSupportTables();
+      await ensurePrestacionesLiquidacionTables();
+      await ensureRehiringParameters();
+      await ensureJornadaLaboralColumn();
+      await ensureGlobalJornadaLaboralColumn();
+      await ensureNominaStatusColumn();
     }
-
-    app.listen(PORT, () => {
-      console.log(`Servidor iniciado en puerto ${PORT}`);
-    });
   } catch (error) {
-    console.error('Error al iniciar el servidor:', error.message);
-    console.log('El servidor continuará ejecutándose...');
+    console.error('Error durante la inicialización:', error.message);
   }
 };
 
-startServer();
+// Iniciar inicialización (no bloqueante para Vercel)
+initializeApp();
+
+// Exportar para Vercel
+module.exports = app;
+
+// Solo escuchar si no estamos en Vercel
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    console.log('\n' + '='.repeat(50));
+    console.log('SERVIDOR INICIADO LOCALMENTE');
+    console.log('='.repeat(50));
+    console.log(`URL: http://localhost:${PORT}`);
+    console.log(`Entorno: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Base de datos: ${process.env.DB_NAME}`);
+    console.log('='.repeat(50) + '\n');
+  });
+}
 
 process.on('SIGTERM', () => {
   console.log('\nSenal SIGTERM recibida. Cerrando servidor...');

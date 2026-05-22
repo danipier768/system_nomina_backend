@@ -13,9 +13,9 @@ const {
   getAutomaticPayrollImpactDataForEmployee,
   validatePayrollImpactData,
   getEmployeeIdForRequest,
-  saveSupportFile,
-  buildApprovalPayrollSnapshot
+  saveSupportFile
 } = require('./requests.helpers');
+const { contarDiasHabilesEnRango, JORNADA } = require('../../utils/businessDays');
 
 // Obtiene una solicitud por id para centralizar la validacion previa
 // antes de aprobarla o rechazarla.
@@ -29,12 +29,13 @@ const getRequestById = async (idSolicitud) => {
       s.fecha_inicio,
       s.fecha_fin,
       s.dias_solicitados,
+      s.dias_disfrutar,
+      s.dias_dinero,
       s.horas_solicitadas,
       s.es_remunerado,
       s.porcentaje_pago,
       s.origen_novedad,
-      s.estado,
-      s.pendiente_liquidacion
+      s.estado
     FROM solicitudes_laborales s
     WHERE s.id_solicitud = ?
     LIMIT 1`,
@@ -259,22 +260,9 @@ const updateBasicRequestStatus = async ({
        SET estado = ?,
            comentario_aprobador = ?,
            fecha_respuesta = CURRENT_TIMESTAMP,
-           aprobado_por = ?,
-           pendiente_liquidacion = ?,
-           liquidada_en_nomina = 0,
-           fecha_liquidacion = NULL,
-           impacto_nomina_calculado = ?
+           aprobado_por = ?
        WHERE id_solicitud = ?`,
-      [
-        nextStatus,
-        comentarioAprobador,
-        req.user.id_usuario,
-        nextStatus === 'APROBADA' ? 1 : 0,
-        nextStatus === 'APROBADA'
-          ? JSON.stringify(buildApprovalPayrollSnapshot({ requestRow: request }))
-          : null,
-        idSolicitud
-      ]
+      [nextStatus, comentarioAprobador, req.user.id_usuario, idSolicitud]
     );
 
     const [updatedRows] = await pool.query(
@@ -286,14 +274,7 @@ const updateBasicRequestStatus = async ({
         s.fecha_inicio,
         s.fecha_fin,
         s.dias_solicitados,
-        s.horas_solicitadas,
-        s.es_remunerado,
-        s.porcentaje_pago,
-        s.origen_novedad,
         s.estado,
-        s.pendiente_liquidacion,
-        s.liquidada_en_nomina,
-        s.fecha_liquidacion,
         s.comentario_empleado,
         s.comentario_aprobador,
         s.fecha_solicitud,
@@ -333,7 +314,9 @@ const createVacationRequest = async (req, res) => {
       comentario_empleado,
       documento_soporte,
       sub_tipo,
-      support_file
+      support_file,
+      dias_disfrutar = 0,
+      dias_dinero = 0
     } = req.body;
 
     if (!idEmpleado) {
@@ -350,6 +333,24 @@ const createVacationRequest = async (req, res) => {
       });
     }
 
+    // Validaciones de negocio para división de vacaciones
+    const dDisfrutar = Number(dias_disfrutar);
+    const dDinero = Number(dias_dinero);
+
+    if (dDisfrutar < 0 || dDinero < 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Los dias a disfrutar y en dinero deben ser mayores o iguales a cero'
+      });
+    }
+
+    if (dDinero > 7) {
+      return res.status(400).json({
+        success: false,
+        message: 'El maximo de dias en dinero permitido es 7'
+      });
+    }
+
     if (req.user?.rol === 'EMPLEADO' && !req.user?.id_empleado) {
       return res.status(403).json({
         success: false,
@@ -362,16 +363,6 @@ const createVacationRequest = async (req, res) => {
       body: req.body
     });
 
-    // Si el cliente no envia dias_solicitados, se calculan automaticamente por rango.
-    const requestedDays = Number(req.body.dias_solicitados) || calculateRequestedDays(fecha_inicio, fecha_fin);
-
-    if (requestedDays <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Los dias solicitados deben ser mayores a cero'
-      });
-    }
-
     if (new Date(fecha_fin) < new Date(fecha_inicio)) {
       return res.status(400).json({
         success: false,
@@ -380,7 +371,7 @@ const createVacationRequest = async (req, res) => {
     }
 
     const [employeeRows] = await pool.query(
-      `SELECT id_empleado FROM empleados WHERE id_empleado = ?`,
+      `SELECT id_empleado, jornada_laboral FROM empleados WHERE id_empleado = ?`,
       [idEmpleado]
     );
 
@@ -388,6 +379,30 @@ const createVacationRequest = async (req, res) => {
       return res.status(404).json({
         success: false,
         message: 'Empleado no encontrado'
+      });
+    }
+
+    const jornadaLaboral = employeeRows[0].jornada_laboral || 'LUNES_VIERNES';
+
+    // Calcular los dias habiles reales dentro del rango de fechas.
+    const { habiles: businessDays, calendario: calendarDays } = contarDiasHabilesEnRango(
+      fecha_inicio, fecha_fin, jornadaLaboral
+    );
+
+    const dDisfrutarFinal = businessDays;
+    const totalSolicitadoFinal = dDisfrutarFinal + dDinero;
+
+    if (totalSolicitadoFinal > 15) {
+      return res.status(400).json({
+        success: false,
+        message: `El total de dias habiles (${dDisfrutarFinal}) mas los dias en dinero (${dDinero}) no puede exceder los 15 dias`
+      });
+    }
+
+    if (totalSolicitadoFinal <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: 'Debes solicitar al menos un dia de vacaciones'
       });
     }
 
@@ -421,14 +436,36 @@ const createVacationRequest = async (req, res) => {
     const balance = balanceRows[0];
 
     // Se bloquea la creacion si el empleado no tiene dias suficientes.
-    if (Number(balance.dias_pendientes) < requestedDays) {
+    if (Number(balance.dias_pendientes) < totalSolicitadoFinal) {
       return res.status(400).json({
         success: false,
         message: 'El empleado no tiene saldo suficiente para esta solicitud',
         data: {
           dias_pendientes: Number(balance.dias_pendientes),
-          dias_solicitados: requestedDays
+          dias_solicitados: totalSolicitadoFinal
         }
+      });
+    }
+
+    // Se verifica si el empleado YA tiene un bloque de 6+ dias disfrutados en el periodo,
+    // para permitirle fraccionar el saldo restante en bloques menores (ej: 5 dias).
+    const [periodHistory] = await pool.query(
+      `SELECT COALESCE(SUM(dias_disfrutar), 0) AS total_disfrutado,
+              MAX(dias_disfrutar) AS max_bloque
+       FROM solicitudes_laborales
+       WHERE id_empleado = ?
+         AND tipo = ?
+         AND estado IN ('APROBADA', 'PENDIENTE')
+         AND YEAR(fecha_inicio) = ?`,
+      [idEmpleado, VACATION_TYPE, periodYear]
+    );
+    const tieneBloqueGrande = Number(periodHistory[0]?.max_bloque || 0) >= 6;
+    const yaDisfrutoBloque = Number(periodHistory[0]?.total_disfrutado || 0) >= 6;
+
+    if (dDisfrutarFinal > 0 && dDisfrutarFinal < 6 && !tieneBloqueGrande && !yaDisfrutoBloque) {
+      return res.status(400).json({
+        success: false,
+        message: 'El bloque de descanso debe ser de al menos 6 dias habiles, a menos que ya tengas un bloque aprobado de 6+ dias en este periodo.'
       });
     }
 
@@ -455,15 +492,17 @@ const createVacationRequest = async (req, res) => {
     // La solicitud siempre entra en estado PENDIENTE para revision posterior.
     const [result] = await pool.query(
       `INSERT INTO solicitudes_laborales
-        (id_empleado, tipo, sub_tipo, fecha_inicio, fecha_fin, dias_solicitados, horas_solicitadas, es_remunerado, porcentaje_pago, origen_novedad, estado, comentario_empleado, documento_soporte)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        (id_empleado, tipo, sub_tipo, fecha_inicio, fecha_fin, dias_solicitados, dias_disfrutar, dias_dinero, horas_solicitadas, es_remunerado, porcentaje_pago, origen_novedad, estado, comentario_empleado, documento_soporte)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         idEmpleado,
         VACATION_TYPE,
         sub_tipo || null,
         fecha_inicio,
         fecha_fin,
-        requestedDays,
+        totalSolicitadoFinal,
+        dDisfrutarFinal,
+        dDinero,
         payrollImpactData.horasSolicitadas,
         payrollImpactData.esRemunerado,
         payrollImpactData.porcentajePago,
@@ -483,6 +522,8 @@ const createVacationRequest = async (req, res) => {
         s.fecha_inicio,
         s.fecha_fin,
         s.dias_solicitados,
+        s.dias_disfrutar,
+        s.dias_dinero,
         s.horas_solicitadas,
         s.es_remunerado,
         s.porcentaje_pago,
@@ -579,14 +620,13 @@ const getMyRequests = async (req, res) => {
         s.fecha_inicio,
         s.fecha_fin,
         s.dias_solicitados,
+        s.dias_disfrutar,
+        s.dias_dinero,
         s.horas_solicitadas,
         s.es_remunerado,
         s.porcentaje_pago,
         s.origen_novedad,
         s.estado,
-        s.pendiente_liquidacion,
-        s.liquidada_en_nomina,
-        s.fecha_liquidacion,
         s.comentario_empleado,
         s.comentario_aprobador,
         s.documento_soporte,
@@ -648,14 +688,13 @@ const getAllRequests = async (req, res) => {
         s.fecha_inicio,
         s.fecha_fin,
         s.dias_solicitados,
+        s.dias_disfrutar,
+        s.dias_dinero,
         s.horas_solicitadas,
         s.es_remunerado,
         s.porcentaje_pago,
         s.origen_novedad,
         s.estado,
-        s.pendiente_liquidacion,
-        s.liquidada_en_nomina,
-        s.fecha_liquidacion,
         s.comentario_empleado,
         s.comentario_aprobador,
         s.documento_soporte,
@@ -686,89 +725,6 @@ const getAllRequests = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: 'Error obteniendo las solicitudes'
-    });
-  }
-};
-
-// Reporte consolidado de novedades aprobadas y su impacto en nomina.
-const getApprovedRequestsReport = async (req, res) => {
-  try {
-    const now = new Date();
-    const requestedYear = Number(req.query.anio) || now.getUTCFullYear();
-    const requestedMonth = req.query.mes ? Number(req.query.mes) : null;
-    const queryParams = [];
-    const whereClauses = ['s.estado = \'APROBADA\''];
-
-    if (requestedYear >= 2000 && requestedYear <= 2100) {
-      whereClauses.push('YEAR(s.fecha_inicio) = ?');
-      queryParams.push(requestedYear);
-    }
-
-    if (requestedMonth && requestedMonth >= 1 && requestedMonth <= 12) {
-      whereClauses.push('MONTH(s.fecha_inicio) = ?');
-      queryParams.push(requestedMonth);
-    }
-
-    if (req.query.tipo) {
-      whereClauses.push('s.tipo = ?');
-      queryParams.push(String(req.query.tipo).toUpperCase());
-    }
-
-    if (req.query.id_empleado) {
-      whereClauses.push('s.id_empleado = ?');
-      queryParams.push(Number(req.query.id_empleado));
-    }
-
-    const [rows] = await pool.query(
-      `SELECT
-        s.id_solicitud,
-        s.id_empleado,
-        CONCAT(e.nombres, ' ', e.apellidos) AS empleado,
-        s.tipo,
-        s.sub_tipo,
-        s.fecha_inicio,
-        s.fecha_fin,
-        s.dias_solicitados,
-        s.horas_solicitadas,
-        s.es_remunerado,
-        s.porcentaje_pago,
-        s.origen_novedad,
-        s.pendiente_liquidacion,
-        s.liquidada_en_nomina,
-        nna.id_nomina,
-        nna.categoria,
-        nna.concepto,
-        nna.valor_aplicado
-      FROM solicitudes_laborales s
-      INNER JOIN empleados e ON e.id_empleado = s.id_empleado
-      LEFT JOIN nomina_novedades_aplicadas nna ON nna.id_solicitud = s.id_solicitud
-      WHERE ${whereClauses.join(' AND ')}
-      ORDER BY s.fecha_inicio DESC, s.id_solicitud DESC`,
-      queryParams
-    );
-
-    const resumen = rows.reduce((acc, row) => {
-      if (row.categoria === 'DEVENGADO') acc.total_devengado += Number(row.valor_aplicado || 0);
-      if (row.categoria === 'DEDUCCION') acc.total_deduccion += Number(row.valor_aplicado || 0);
-      return acc;
-    }, { total_solicitudes: rows.length, total_devengado: 0, total_deduccion: 0 });
-
-    return res.json({
-      success: true,
-      data: {
-        resumen: {
-          ...resumen,
-          total_devengado: Number(resumen.total_devengado.toFixed(2)),
-          total_deduccion: Number(resumen.total_deduccion.toFixed(2))
-        },
-        rows
-      }
-    });
-  } catch (error) {
-    console.error('Error generando reporte de solicitudes aprobadas:', error.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Error generando el reporte de solicitudes aprobadas'
     });
   }
 };
@@ -922,18 +878,9 @@ const approveVacationRequest = async (req, res) => {
        SET estado = 'APROBADA',
            comentario_aprobador = ?,
            fecha_respuesta = CURRENT_TIMESTAMP,
-           aprobado_por = ?,
-           pendiente_liquidacion = 1,
-           liquidada_en_nomina = 0,
-           fecha_liquidacion = NULL,
-           impacto_nomina_calculado = ?
+           aprobado_por = ?
        WHERE id_solicitud = ?`,
-      [
-        comentarioAprobador,
-        req.user.id_usuario,
-        JSON.stringify(buildApprovalPayrollSnapshot({ requestRow: request })),
-        idSolicitud
-      ]
+      [comentarioAprobador, req.user.id_usuario, idSolicitud]
     );
 
     await connection.commit();
@@ -947,14 +894,13 @@ const approveVacationRequest = async (req, res) => {
         s.fecha_inicio,
         s.fecha_fin,
         s.dias_solicitados,
+        s.dias_disfrutar,
+        s.dias_dinero,
         s.horas_solicitadas,
         s.es_remunerado,
         s.porcentaje_pago,
         s.origen_novedad,
         s.estado,
-        s.pendiente_liquidacion,
-        s.liquidada_en_nomina,
-        s.fecha_liquidacion,
         s.comentario_empleado,
         s.comentario_aprobador,
         s.fecha_solicitud,
@@ -1025,11 +971,7 @@ const rejectVacationRequest = async (req, res) => {
        SET estado = 'RECHAZADA',
            comentario_aprobador = ?,
            fecha_respuesta = CURRENT_TIMESTAMP,
-           aprobado_por = ?,
-           pendiente_liquidacion = 0,
-           liquidada_en_nomina = 0,
-           fecha_liquidacion = NULL,
-           impacto_nomina_calculado = NULL
+           aprobado_por = ?
        WHERE id_solicitud = ?`,
       [comentarioAprobador, req.user.id_usuario, idSolicitud]
     );
@@ -1043,14 +985,13 @@ const rejectVacationRequest = async (req, res) => {
         s.fecha_inicio,
         s.fecha_fin,
         s.dias_solicitados,
+        s.dias_disfrutar,
+        s.dias_dinero,
         s.horas_solicitadas,
         s.es_remunerado,
         s.porcentaje_pago,
         s.origen_novedad,
         s.estado,
-        s.pendiente_liquidacion,
-        s.liquidada_en_nomina,
-        s.fecha_liquidacion,
         s.comentario_empleado,
         s.comentario_aprobador,
         s.fecha_solicitud,
@@ -1240,11 +1181,7 @@ const cancelVacationRequest = async (req, res) => {
        SET estado = 'CANCELADA',
            comentario_aprobador = ?,
            fecha_respuesta = CURRENT_TIMESTAMP,
-           aprobado_por = ?,
-           pendiente_liquidacion = 0,
-           liquidada_en_nomina = 0,
-           fecha_liquidacion = NULL,
-           impacto_nomina_calculado = NULL
+           aprobado_por = ?
        WHERE id_solicitud = ?`,
       [comentarioAprobador, req.user.id_usuario, idSolicitud]
     );
@@ -1260,14 +1197,13 @@ const cancelVacationRequest = async (req, res) => {
         s.fecha_inicio,
         s.fecha_fin,
         s.dias_solicitados,
+        s.dias_disfrutar,
+        s.dias_dinero,
         s.horas_solicitadas,
         s.es_remunerado,
         s.porcentaje_pago,
         s.origen_novedad,
         s.estado,
-        s.pendiente_liquidacion,
-        s.liquidada_en_nomina,
-        s.fecha_liquidacion,
         s.comentario_empleado,
         s.comentario_aprobador,
         s.fecha_solicitud,
@@ -1332,6 +1268,93 @@ const cancelLicenseRequest = async (req, res) => (
   })
 );
 
+// Elimina permanentemente una solicitud de la base de datos.
+// Si es una solicitud de vacaciones aprobada, devuelve los dias al saldo antes de borrar.
+const deleteLaborRequest = async (req, res) => {
+  const connection = await pool.getConnection();
+
+  try {
+    const idSolicitud = Number(req.params.id);
+
+    if (!idSolicitud) {
+      return res.status(400).json({
+        success: false,
+        message: 'Debes indicar un id de solicitud valido'
+      });
+    }
+
+    const request = await getRequestById(idSolicitud);
+
+    if (!request) {
+      return res.status(404).json({
+        success: false,
+        message: 'Solicitud no encontrada'
+      });
+    }
+
+    // Permisos: ADMIN/RRHH siempre pueden. El EMPLEADO solo si esta PENDIENTE.
+    const isOwner = req.user.rol === 'EMPLEADO' && Number(req.user.id_empleado) === Number(request.id_empleado);
+    const isAdmin = req.user.rol === 'ADMINISTRADOR' || req.user.rol === 'RRHH';
+
+    if (!isAdmin && !(isOwner && request.estado === 'PENDIENTE')) {
+      return res.status(403).json({
+        success: false,
+        message: 'No tienes permiso para eliminar esta solicitud. Solo puedes eliminar solicitudes pendientes propias.'
+      });
+    }
+
+    await connection.beginTransaction();
+
+    // Si la solicitud era de vacaciones y estaba aprobada, recomponemos el saldo.
+    if (request.tipo === VACATION_TYPE && request.estado === 'APROBADA') {
+      const periodYear = new Date(request.fecha_inicio).getUTCFullYear();
+
+      const [balanceRows] = await connection.query(
+        `SELECT id_saldo, dias_disfrutados, dias_pendientes
+         FROM vacaciones_saldos
+         WHERE id_empleado = ? AND periodo_anio = ?
+         LIMIT 1
+         FOR UPDATE`,
+        [request.id_empleado, periodYear]
+      );
+
+      if (balanceRows.length > 0) {
+        const balance = balanceRows[0];
+        const requestedDays = Number(request.dias_solicitados) || 0;
+
+        await connection.query(
+          `UPDATE vacaciones_saldos
+           SET dias_disfrutados = dias_disfrutados - ?,
+               dias_pendientes = dias_pendientes + ?
+           WHERE id_saldo = ?`,
+          [requestedDays, requestedDays, balance.id_saldo]
+        );
+      }
+    }
+
+    await connection.query(
+      'DELETE FROM solicitudes_laborales WHERE id_solicitud = ?',
+      [idSolicitud]
+    );
+
+    await connection.commit();
+
+    return res.json({
+      success: true,
+      message: 'Solicitud eliminada permanentemente del sistema'
+    });
+  } catch (error) {
+    await connection.rollback();
+    console.error('Error eliminando solicitud laboral:', error.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Error eliminando la solicitud'
+    });
+  } finally {
+    connection.release();
+  }
+};
+
 module.exports = {
   createVacationRequest,
   createPermissionRequest,
@@ -1339,7 +1362,6 @@ module.exports = {
   createLicenseRequest,
   getMyRequests,
   getAllRequests,
-  getApprovedRequestsReport,
   getVacationBalance,
   approveVacationRequest,
   rejectVacationRequest,
@@ -1352,5 +1374,6 @@ module.exports = {
   cancelDisabilityRequest,
   approveLicenseRequest,
   rejectLicenseRequest,
-  cancelLicenseRequest
+  cancelLicenseRequest,
+  deleteLaborRequest
 };
