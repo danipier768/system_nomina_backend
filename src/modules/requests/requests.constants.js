@@ -1,0 +1,21 @@
+const path = require('path');
+
+const VACATION_TYPE = 'VACACIONES';
+const PERMISSION_TYPE = 'PERMISO';
+const DISABILITY_TYPE = 'INCAPACIDAD';
+const LICENSE_TYPE = 'LICENCIA';
+const PENDING_STATUS = 'PENDIENTE';
+const VISIBLE_REQUEST_STATUSES = ['PENDIENTE', 'APROBADA'];
+const VALID_ORIGINS = new Set(['COMUN', 'LABORAL']);
+const SUPPORT_FILES_DIR = path.join(__dirname, '..', '..', '..', 'uploads', 'solicitudes');
+
+module.exports = {
+  VACATION_TYPE,
+  PERMISSION_TYPE,
+  DISABILITY_TYPE,
+  LICENSE_TYPE,
+  PENDING_STATUS,
+  VISIBLE_REQUEST_STATUSES,
+  VALID_ORIGINS,
+  SUPPORT_FILES_DIR
+};
