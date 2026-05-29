@@ -225,7 +225,7 @@ const createEmployee = async (req, res) => {
     }
 
     // Validar salario
-    const salaryValidation = validateNumericField(sueldo, 0);
+    const salaryValidation = validateNumericField(sueldo, 1000000); // Sueldo mínimo 1 millón
     if (!salaryValidation.isValid) {
       return res.status(400).json({
         success: false,

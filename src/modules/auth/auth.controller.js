@@ -4,7 +4,7 @@ const { pool } = require("../../config/database.js");
 const { sendPasswordResetEmail } = require("../../services/emailService");
 const {PASSWORD_MIN_LENGTH, JWT_EXPIRES_IN} = require("./auth.constants");
 const {isValidEmail, generatePasswordResetToken, buildPasswordResetExpiration} = require("./auth.helpers");
-const {validateEmail, validatePassword, validatePasswordMatch, validateLoginInput,validateResetToken} = require("../../utils/validators");
+const {validateEmail, validatePassword, validatePasswordMatch, validateLoginInput, validateResetToken, validateUsername} = require("../../utils/validators");
 
 // Inicia sesion y devuelve el token JWT junto con el usuario autenticado.
 const login = async (req, res) => {
@@ -102,6 +102,12 @@ const register = async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "Email invalido",
+      });
+    }
+    if (!validateUsername(username).isValid) {
+      return res.status(400).json({
+        success: false,
+        message: "Username invalido",
       });
     }
 

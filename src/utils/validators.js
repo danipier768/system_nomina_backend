@@ -119,6 +119,10 @@ const validateIdentificationNumber = (numero) => {
   if (!numero || numero.trim() === '') {
     return { isValid: false, error: 'Número de identificación requerido' };
   }
+  //validar longitud: mínimo 5, máximo 15 caracteres
+if (numero.trim().length < 5 || numero.trim().length > 15) {
+    return { isValid: false, error: 'Número de identificación debe tener entre 5 y 15 caracteres' };
+  }
 
   // Solo números y algunos caracteres especiales comunes en IDs
   const idRegex = /^[0-9\-]+$/;
@@ -221,12 +225,12 @@ const validateUsername = (username) => {
 
   const length = username.trim().length;
 
-  if (length < 3) {
-    return { isValid: false, error: 'Username muy corto (mínimo 3 caracteres)' };
+  if (length < 6) {
+    return { isValid: false, error: 'Username muy corto (mínimo 6 caracteres)' };
   }
 
-  if (length > 50) {
-    return { isValid: false, error: 'Username muy largo (máximo 50 caracteres)' };
+  if (length > 25) {
+    return { isValid: false, error: 'Username muy largo (máximo 25 caracteres)' };
   }
 
   // Validar que solo contenga letras, números, guiones y guiones bajos
