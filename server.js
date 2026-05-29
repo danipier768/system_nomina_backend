@@ -38,7 +38,7 @@ const PORT = process.env.PORT || 5000;
 // Permite que el frontend consuma la API del backend.
 app.use(cors({
   origin: [
-    'https://system-payroll.vercel.app',
+    'https://system-payroll-pydz.vercel.app',
     'https://system-nomina-dsv.vercel.app'
   ],
   credentials: true
