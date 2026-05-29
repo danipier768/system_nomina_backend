@@ -35,9 +35,9 @@ const getAllEmployees = async (req, res) => {
 
     const [countResult] = isEmployeeRole
       ? await pool.query(
-          `SELECT COUNT(*) as total FROM empleados WHERE id_empleado = ? AND activo = TRUE`,
-          [req.user.id_empleado]
-        )
+        `SELECT COUNT(*) as total FROM empleados WHERE id_empleado = ? AND activo = TRUE`,
+        [req.user.id_empleado]
+      )
       : await pool.query(`SELECT COUNT(*) as total FROM empleados WHERE ${includeInactive ? '1=1' : 'activo = TRUE'}`);
 
     const total = countResult[0].total;
@@ -225,7 +225,10 @@ const createEmployee = async (req, res) => {
     }
 
     // Validar salario
-    const salaryValidation = validateNumericField(sueldo, 1000000); // Sueldo mínimo 1 millón
+    const salaryValidation = validateNumericField(sueldo, 1000000);// Sueldo mínimo 1 millón
+    if (sueldo <= 0 || sueldo > 999999999) {
+      return alert("Sueldo inválido");
+    } 
     if (!salaryValidation.isValid) {
       return res.status(400).json({
         success: false,
@@ -623,7 +626,7 @@ const reactivateEmployee = async (req, res) => {
           if (hoy < fechaMinima) {
             const options = { year: 'numeric', month: 'long', day: 'numeric' };
             const fechaFormateada = fechaMinima.toLocaleDateString('es-ES', options);
-            
+
             return res.status(403).json({
               success: false,
               message: `No se puede reactivar al empleado. El tiempo de espera para recontratación no se ha cumplido. Podrá ser reactivado a partir del ${fechaFormateada}.`,
