@@ -103,7 +103,7 @@ const sendPasswordResetEmail = async (to, username, token) => {
                             </div>
 
                             <div class="warning">
-                                <strong>Importante:</strong> Este codigo expirara en <strong>30 minutos</strong>.
+                                <strong>Importante:</strong> Este codigo expirara en <strong>10 minutos</strong>.
                             </div>
 
                             <p>Para restablecer tu contrasena:</p>
@@ -134,7 +134,7 @@ const sendPasswordResetEmail = async (to, username, token) => {
 
                 Tu codigo de verificacion es: ${token}
 
-                Este codigo expirara en 30 minutos.
+                Este codigo expirara en 10 minutos.
 
                 Si no solicitaste esto, ignora este correo.
 

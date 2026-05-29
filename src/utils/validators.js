@@ -280,7 +280,7 @@ const validateResetToken = (token) => {
     return { isValid: false, error: 'Token requerido' };
   }
 
-  if (token.length < 10) {
+  if (token.length !== 6 || isNaN(token)) {
     return { isValid: false, error: 'Token inválido' };
   }
 
