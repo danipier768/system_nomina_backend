@@ -1,5 +1,5 @@
-const isVercel = process.env.VERCEL === '1' || !!process.env.VERCEL;
-const puppeteer = isVercel ? require('puppeteer-core') : require('puppeteer');
+const isServerless = !!process.env.VERCEL || !!process.env.RENDER;
+const puppeteer = isServerless ? require('puppeteer-core') : require('puppeteer');
 const { buildPayrollPdfTemplate } = require('./payroll-pdf.template');
 
 const generatePayrollPdfBuffer = async ({ payroll, detailRows, overtimeRows }) => {
@@ -8,7 +8,7 @@ const generatePayrollPdfBuffer = async ({ payroll, detailRows, overtimeRows }) =
   try {
     const html = buildPayrollPdfTemplate({ payroll, detailRows, overtimeRows });
 
-    if (isVercel) {
+    if (isServerless) {
       const chromium = require('@sparticuz/chromium');
       browser = await puppeteer.launch({
         args: chromium.args,
