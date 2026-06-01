@@ -37,7 +37,7 @@ const PORT = process.env.PORT || 5000;
 app.use(cors({
   origin: [
     process.env.FRONTEND_URL,
-    'https://payroll-dsv.vercel.app/',
+    'https://payroll-dsv.vercel.app',
     'localhost:5730'
   ],
   credentials: true
