@@ -1,3 +1,4 @@
+const logger = require('../../utils/logger');
 const { pool } = require('../../config/database');
 const {
   VACATION_TYPE,
@@ -195,7 +196,7 @@ const createBasicLaborRequest = async ({
       data: createdRows[0]
     });
   } catch (error) {
-    console.error(`Error creando solicitud ${requestType.toLowerCase()}:`, error.message);
+    logger.error(`Error creando solicitud ${requestType.toLowerCase()}:`, error.message);
 
     if (error.statusCode) {
       return res.status(error.statusCode).json({
@@ -292,7 +293,7 @@ const updateBasicRequestStatus = async ({
       data: updatedRows[0]
     });
   } catch (error) {
-    console.error(`Error actualizando solicitud ${expectedType.toLowerCase()}:`, error.message);
+    logger.error(`Error actualizando solicitud ${expectedType.toLowerCase()}:`, error.message);
     return res.status(500).json({
       success: false,
       message: `Error gestionando la solicitud de ${expectedType.toLowerCase()}`
@@ -545,7 +546,7 @@ const createVacationRequest = async (req, res) => {
       data: createdRows[0]
     });
   } catch (error) {
-    console.error('Error creando solicitud de vacaciones:', error.message);
+    logger.error('Error creando solicitud de vacaciones:', error.message);
 
     if (error.statusCode) {
       return res.status(error.statusCode).json({
@@ -645,7 +646,7 @@ const getMyRequests = async (req, res) => {
       count: rows.length
     });
   } catch (error) {
-    console.error('Error obteniendo mis solicitudes:', error.message);
+    logger.error('Error obteniendo mis solicitudes:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error obteniendo las solicitudes del empleado'
@@ -721,7 +722,7 @@ const getAllRequests = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error obteniendo solicitudes administrativas:', error.message);
+    logger.error('Error obteniendo solicitudes administrativas:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error obteniendo las solicitudes'
@@ -780,7 +781,7 @@ const getVacationBalance = async (req, res) => {
       data: rows[0]
     });
   } catch (error) {
-    console.error('Error obteniendo saldo de vacaciones:', error.message);
+    logger.error('Error obteniendo saldo de vacaciones:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error obteniendo el saldo de vacaciones'
@@ -919,7 +920,7 @@ const approveVacationRequest = async (req, res) => {
     });
   } catch (error) {
     await connection.rollback();
-    console.error('Error aprobando solicitud de vacaciones:', error.message);
+    logger.error('Error aprobando solicitud de vacaciones:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error aprobando la solicitud de vacaciones'
@@ -1009,7 +1010,7 @@ const rejectVacationRequest = async (req, res) => {
       data: updatedRows[0]
     });
   } catch (error) {
-    console.error('Error rechazando solicitud de vacaciones:', error.message);
+    logger.error('Error rechazando solicitud de vacaciones:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error rechazando la solicitud de vacaciones'
@@ -1222,7 +1223,7 @@ const cancelVacationRequest = async (req, res) => {
     });
   } catch (error) {
     await connection.rollback();
-    console.error('Error cancelando solicitud de vacaciones:', error.message);
+    logger.error('Error cancelando solicitud de vacaciones:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error cancelando la solicitud de vacaciones'
@@ -1345,7 +1346,7 @@ const deleteLaborRequest = async (req, res) => {
     });
   } catch (error) {
     await connection.rollback();
-    console.error('Error eliminando solicitud laboral:', error.message);
+    logger.error('Error eliminando solicitud laboral:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error eliminando la solicitud'

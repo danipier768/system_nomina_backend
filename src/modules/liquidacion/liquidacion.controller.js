@@ -1,3 +1,4 @@
+const logger = require('../../utils/logger');
 const { pool } = require('../../config/database');
 const { generateLiquidacionPdfBuffer } = require('./liquidacion-pdf.service');
 
@@ -115,7 +116,7 @@ const calcularLiquidacion = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error calculando liquidacion:', error.message);
+    logger.error('Error calculando liquidacion:', error.message);
     return res.status(500).json({ success: false, message: 'Error calculando liquidacion' });
   }
 };
@@ -209,7 +210,7 @@ const guardarLiquidacion = async (req, res) => {
     });
   } catch (error) {
     await connection.rollback();
-    console.error('Error guardando liquidacion:', error.message);
+    logger.error('Error guardando liquidacion:', error.message);
     return res.status(500).json({ success: false, message: 'Error guardando liquidacion' });
   } finally {
     connection.release();
@@ -261,7 +262,7 @@ const getLiquidaciones = async (req, res) => {
 
     return res.json({ success: true, data: rows });
   } catch (error) {
-    console.error('Error obteniendo liquidaciones:', error.message);
+    logger.error('Error obteniendo liquidaciones:', error.message);
     return res.status(500).json({ success: false, message: 'Error obteniendo liquidaciones' });
   }
 };
@@ -301,7 +302,7 @@ const getLiquidacionById = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error obteniendo liquidacion:', error.message);
+    logger.error('Error obteniendo liquidacion:', error.message);
     return res.status(500).json({ success: false, message: 'Error obteniendo liquidacion' });
   }
 };
@@ -341,7 +342,7 @@ const anularLiquidacion = async (req, res) => {
     return res.json({ success: true, message: 'Liquidacion anulada y empleado reactivado' });
   } catch (error) {
     await connection.rollback();
-    console.error('Error anulando liquidacion:', error.message);
+    logger.error('Error anulando liquidacion:', error.message);
     return res.status(500).json({ success: false, message: 'Error anulando liquidacion' });
   } finally {
     connection.release();
@@ -372,7 +373,7 @@ const marcarPagada = async (req, res) => {
 
     return res.json({ success: true, message: 'Liquidacion marcada como pagada' });
   } catch (error) {
-    console.error('Error actualizando liquidacion:', error.message);
+    logger.error('Error actualizando liquidacion:', error.message);
     return res.status(500).json({ success: false, message: 'Error actualizando liquidacion' });
   }
 };
@@ -423,7 +424,7 @@ const downloadLiquidacionPdf = async (req, res) => {
 
     return res.send(pdfBuffer);
   } catch (error) {
-    console.error('Error generando PDF liquidacion:', error.message);
+    logger.error('Error generando PDF liquidacion:', error.message);
     return res.status(500).json({ success: false, message: 'Error generando PDF' });
   }
 };
@@ -445,7 +446,7 @@ const getRecontratacionConfig = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error obteniendo config recontratacion:', error.message);
+    logger.error('Error obteniendo config recontratacion:', error.message);
     return res.status(500).json({ success: false, message: 'Error obteniendo configuracion' });
   }
 };
@@ -483,7 +484,7 @@ const updateRecontratacionConfig = async (req, res) => {
       data: { meses: nMeses, dias: nDias }
     });
   } catch (error) {
-    console.error('Error actualizando config recontratacion:', error.message);
+    logger.error('Error actualizando config recontratacion:', error.message);
     return res.status(500).json({ success: false, message: 'Error actualizando configuracion' });
   }
 };
@@ -502,7 +503,7 @@ const getJornadaLaboralConfig = async (req, res) => {
       data: { jornada_laboral: jornada }
     });
   } catch (error) {
-    console.error('Error obteniendo jornada laboral:', error.message);
+    logger.error('Error obteniendo jornada laboral:', error.message);
     return res.status(500).json({ success: false, message: 'Error obteniendo configuracion' });
   }
 };
@@ -535,7 +536,7 @@ const updateJornadaLaboralConfig = async (req, res) => {
       data: { jornada_laboral }
     });
   } catch (error) {
-    console.error('Error actualizando jornada laboral:', error.message);
+    logger.error('Error actualizando jornada laboral:', error.message);
     return res.status(500).json({ success: false, message: 'Error actualizando configuracion' });
   }
 };
@@ -590,7 +591,7 @@ const revertirPago = async (req, res) => {
     });
   } catch (error) {
     await connection.rollback();
-    console.error('Error revertiendo pago:', error.message);
+    logger.error('Error revertiendo pago:', error.message);
     return res.status(500).json({ success: false, message: 'Error al revertir el pago' });
   } finally {
     connection.release();
@@ -642,7 +643,7 @@ const revertirAnulacion = async (req, res) => {
     });
   } catch (error) {
     await connection.rollback();
-    console.error('Error revertiendo anulación:', error.message);
+    logger.error('Error revertiendo anulación:', error.message);
     return res.status(500).json({ success: false, message: 'Error al revertir la anulación' });
   } finally {
     connection.release();
@@ -687,7 +688,7 @@ const deleteLiquidacion = async (req, res) => {
     return res.json({ success: true, message: 'Liquidación eliminada exitosamente' });
   } catch (error) {
     await connection.rollback();
-    console.error('Error eliminando liquidación:', error.message);
+    logger.error('Error eliminando liquidación:', error.message);
     return res.status(500).json({ success: false, message: 'Error al eliminar la liquidación' });
   } finally {
     connection.release();

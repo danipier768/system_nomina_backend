@@ -1,3 +1,4 @@
+const logger = require('../../utils/logger');
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const { pool } = require("../../config/database.js");
@@ -78,7 +79,7 @@ const login = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error en login:", error);
+    logger.error("Error en login:", error);
     res.status(500).json({
       success: false,
       message: "Error al iniciar sesion",
@@ -162,7 +163,7 @@ const register = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error al registrar:", error);
+    logger.error("Error al registrar:", error);
     res.status(500).json({
       success: false,
       message: "Error al registrar usuario",
@@ -220,9 +221,9 @@ const requestPasswordReset = async (req, res) => {
     );
 
     if (emailResult.success) {
-      console.log("Email enviado exitosamente a:", user.email);
+      logger.info("Email enviado exitosamente a:", user.email);
     } else {
-      console.error("Error al enviar email:", emailResult.error);
+      logger.error("Error al enviar email:", emailResult.error);
     }
 
     res.json({
@@ -237,7 +238,7 @@ const requestPasswordReset = async (req, res) => {
       }),
     });
   } catch (error) {
-    console.error("Error en requestPasswordReset:", error);
+    logger.error("Error en requestPasswordReset:", error);
     res.status(500).json({
       success: false,
       message: "Error al procesar la solicitud",
@@ -359,7 +360,7 @@ const resetPassword = async (req, res) => {
       message: "Contrasena actualizada exitosamente",
     });
   } catch (error) {
-    console.error("Error en resetPassword: ", error);
+    logger.error("Error en resetPassword: ", error);
     res.status(500).json({
       success: false,
       message: "Error al restablecer la contrasena",
@@ -398,7 +399,7 @@ const getProfile = async (req, res) => {
       user: users[0],
     });
   } catch (error) {
-    console.error("Error en getProfile:", error);
+    logger.error("Error en getProfile:", error);
     res.status(500).json({
       success: false,
       message: "Error al obtener perfil",

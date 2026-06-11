@@ -1,3 +1,4 @@
+const logger = require('../../utils/logger');
 const { pool } = require("../../config/database.js");
 const {
   EMPLOYEE_SEARCH_LIMIT,
@@ -79,7 +80,7 @@ const getAllEmployees = async (req, res) => {
 
     res.json({
       success: true,
-      succes: true,
+      success: true,
       data: employees,
       pagination: {
         page,
@@ -89,7 +90,7 @@ const getAllEmployees = async (req, res) => {
       },
     });
   } catch (error) {
-    console.error("Error en getAllEmployees:", error);
+    logger.error("Error en getAllEmployees:", error);
     res.status(500).json({
       success: false,
       message: "Error al obtener empleados",
@@ -155,7 +156,7 @@ const getEmployeeById = async (req, res) => {
       data: employees[0],
     });
   } catch (error) {
-    console.error("Error en getEmployeeById:", error);
+    logger.error("Error en getEmployeeById:", error);
     res.status(500).json({
       success: false,
       message: "Error al obtener empleado",
@@ -226,9 +227,6 @@ const createEmployee = async (req, res) => {
 
     // Validar salario
     const salaryValidation = validateNumericField(sueldo, 1000000);// Sueldo mínimo 1 millón
-    if (sueldo <= 0 || sueldo > 999999999) {
-      return alert("Sueldo inválido");
-    } 
     if (!salaryValidation.isValid) {
       return res.status(400).json({
         success: false,
@@ -343,7 +341,7 @@ const createEmployee = async (req, res) => {
     });
   } catch (error) {
     await connection.rollback();
-    console.error("Error en createEmployee:", error);
+    logger.error("Error en createEmployee:", error);
     res.status(500).json({
       success: false,
       message: "Error al crear empleado",
@@ -449,7 +447,7 @@ const updateEmployee = async (req, res) => {
       data: updated[0],
     });
   } catch (error) {
-    console.error("Error en updateEmployee:", error);
+    logger.error("Error en updateEmployee:", error);
     res.status(500).json({
       success: false,
       message: "Error al actualizar empleado",
@@ -558,7 +556,7 @@ const deleteEmployee = async (req, res) => {
       userRole,
     });
   } catch (error) {
-    console.error("Error en deleteEmployee:", error);
+    logger.error("Error en deleteEmployee:", error);
     res.status(500).json({
       success: false,
       message: "Error al procesar la solicitud",
@@ -670,7 +668,7 @@ const reactivateEmployee = async (req, res) => {
       userRole,
     });
   } catch (error) {
-    console.error("Error en reactivateEmployee:", error);
+    logger.error("Error en reactivateEmployee:", error);
     res.status(500).json({
       success: false,
       message: "Error al reactivar empleado",
@@ -733,7 +731,7 @@ const searchEmployees = async (req, res) => {
       count: employees.length,
     });
   } catch (error) {
-    console.error("Error en searchEmployees:", error);
+    logger.error("Error en searchEmployees:", error);
     res.status(500).json({
       success: false,
       message: "Error al buscar empleados",
@@ -811,7 +809,7 @@ const updateMyProfile = async (req, res) => {
       data: updated[0],
     });
   } catch (error) {
-    console.error('Error en updateMyProfile:', error);
+    logger.error('Error en updateMyProfile:', error);
     return res.status(500).json({
       success: false,
       message: 'Error al actualizar perfil',

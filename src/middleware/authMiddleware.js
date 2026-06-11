@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const jwt = require("jsonwebtoken");
 const { pool } = require("../config/database");
 
@@ -58,7 +59,7 @@ const verifyToken = async (req, res, next) => {
 
     next();
   } catch (error) {
-    console.error("Error en verifyToken:", error.message);
+    logger.error("Error en verifyToken:", error.message);
 
     if (error.name === "JsonWebTokenError") {
       return res.status(401).json({

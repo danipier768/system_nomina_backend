@@ -1,3 +1,4 @@
+const logger = require('../../utils/logger');
 const { pool } = require('../../config/database');
 
 const PRIMA_PCT = 1 / 12;
@@ -76,7 +77,7 @@ const getPrestacionesResumen = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error obteniendo prestaciones:', error.message);
+    logger.error('Error obteniendo prestaciones:', error.message);
     return res.status(500).json({ success: false, message: 'Error obteniendo prestaciones sociales' });
   }
 };
@@ -149,7 +150,7 @@ const acumularPrestaciones = async (req, res) => {
       message: `Prestaciones acumuladas para empleado ${id_empleado} - ${year}/${month}`
     });
   } catch (error) {
-    console.error('Error acumulando prestaciones:', error.message);
+    logger.error('Error acumulando prestaciones:', error.message);
     return res.status(500).json({ success: false, message: 'Error acumulando prestaciones' });
   } finally {
     connection.release();
@@ -180,7 +181,7 @@ const acumularPrestacionesMasivo = async (req, res) => {
       message: `Prestaciones acumuladas para ${empRows.length} empleados - ${year}/${month}`
     });
   } catch (error) {
-    console.error('Error acumulando prestaciones masivo:', error.message);
+    logger.error('Error acumulando prestaciones masivo:', error.message);
     return res.status(500).json({ success: false, message: 'Error acumulando prestaciones masivo' });
   } finally {
     connection.release();

@@ -6,6 +6,7 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const rateLimit = require('express-rate-limit');
 
 const {
   testConnection,
@@ -20,6 +21,8 @@ const {
   ensureNominaStatusColumn
 } = require('./src/config/database.js');
 const { verifyConnection } = require('./src/services/emailService');
+const { verifyToken } = require('./src/middleware/authMiddleware');
+const logger = require('./src/utils/logger');
 
 const authRoutes = require('./src/modules/auth/auth.routes.js');
 const employeeRoutes = require('./src/modules/employees/employees.routes.js');
@@ -49,10 +52,26 @@ app.use(express.urlencoded({ extended: true, limit: '20mb' }));
 
 app.use((req, res, next) => {
   if (process.env.NODE_ENV === 'development') {
-    console.log(`${req.method} ${req.path}`);
+    logger.debug(`${req.method} ${req.path}`);
   }
   next();
 });
+
+// Rate limiting para login y reset de contraseña
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: {
+    success: false,
+    message: 'Demasiados intentos. Intenta de nuevo en 15 minutos.'
+  },
+  standardHeaders: true,
+  legacyHeaders: false
+});
+
+app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/request-reset', authLimiter);
+app.use('/api/auth/reset-password', authLimiter);
 
 app.get('/', (req, res) => {
   res.json({
@@ -73,8 +92,8 @@ app.get('/api/health', async (req, res) => {
   });
 });
 
-// Expone los soportes guardados para que el frontend pueda consultarlos.
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Sirve archivos estaticos solo si el usuario esta autenticado.
+app.use('/uploads', verifyToken, express.static(path.join(__dirname, 'uploads')));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/employees', employeeRoutes);
@@ -87,7 +106,7 @@ app.use('/api/liquidacion', liquidacionRoutes);
 
 app.use((err, req, res, next) => {
   if (process.env.NODE_ENV === 'development') {
-    console.error('Error:', err.stack);
+    logger.error(err.stack);
   }
 
   if (err.type === 'entity.too.large') {
@@ -106,18 +125,18 @@ app.use((err, req, res, next) => {
 
 const initializeApp = async () => {
   try {
-    console.log('Probando conexion a la base de datos...');
+    logger.info('Probando conexion a la base de datos...');
     const dbConnected = await testConnection();
 
-    console.log('Probando conexion al servidor de email...');
+    logger.info('Probando conexion al servidor de email...');
     await verifyConnection();
 
     if (!dbConnected) {
-      console.error('Advertencia: No se pudo conectar a la base de datos');
+      logger.warn('No se pudo conectar a la base de datos');
     }
 
     if (dbConnected) {
-      console.log('Verificando migraciones minimas de base de datos...');
+      logger.info('Verificando migraciones minimas de base de datos...');
       await ensureEmployeeSalaryColumn();
       await ensureEmployeeWithdrawalColumn();
       await ensureDefaultDepartments();
@@ -129,7 +148,7 @@ const initializeApp = async () => {
       await ensureNominaStatusColumn();
     }
   } catch (error) {
-    console.error('Error durante la inicialización:', error.message);
+    logger.error('Error durante la inicialización:', error.message);
   }
 };
 
@@ -142,22 +161,37 @@ module.exports = app;
 // Solo escuchar si no estamos en Vercel
 if (!process.env.VERCEL) {
   app.listen(PORT, () => {
-    console.log('\n' + '='.repeat(50));
-    console.log('SERVIDOR INICIADO LOCALMENTE');
-    console.log('='.repeat(50));
-    console.log(`URL: http://localhost:${PORT}`);
-    console.log(`Entorno: ${process.env.NODE_ENV || 'development'}`);
-    console.log(`Base de datos: ${process.env.DB_NAME}`);
-    console.log('='.repeat(50) + '\n');
+    logger.info('='.repeat(50));
+    logger.info('SERVIDOR INICIADO LOCALMENTE');
+    logger.info('='.repeat(50));
+    logger.info(`URL: http://localhost:${PORT}`);
+    logger.info(`Entorno: ${process.env.NODE_ENV || 'development'}`);
+    logger.info(`Base de datos: ${process.env.DB_NAME}`);
+    logger.info('='.repeat(50));
   });
 }
 
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled Rejection:', reason instanceof Error ? reason.message : reason);
+  if (process.env.NODE_ENV === 'development') {
+    logger.error(reason instanceof Error ? reason.stack : reason);
+  }
+});
+
+process.on('uncaughtException', (err) => {
+  logger.error('Uncaught Exception:', err.message);
+  if (process.env.NODE_ENV === 'development') {
+    logger.error(err.stack);
+  }
+  process.exit(1);
+});
+
 process.on('SIGTERM', () => {
-  console.log('\nSenal SIGTERM recibida. Cerrando servidor...');
+  logger.warn('Senal SIGTERM recibida. Cerrando servidor...');
   process.exit(0);
 });
 
 process.on('SIGINT', () => {
-  console.log('\nSenal SIGINT recibida. Cerrando servidor...');
+  logger.warn('Senal SIGINT recibida. Cerrando servidor...');
   process.exit(0);
 });

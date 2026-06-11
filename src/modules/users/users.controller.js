@@ -1,3 +1,4 @@
+const logger = require('../../utils/logger');
 const { pool } = require("../../config/database.js");
 const { isCurrentUser, buildUserUpdateQuery } = require("./users.helpers");
 
@@ -27,7 +28,7 @@ const getAllUsers = async (req, res) => {
       count: users.length,
     });
   } catch (error) {
-    console.error("Error al obtener usuarios:", error);
+    logger.error("Error al obtener usuarios:", error);
     res.status(500).json({
       success: false,
       message: "Error al obtener usuarios",
@@ -70,7 +71,7 @@ const getUserById = async (req, res) => {
       data: users[0],
     });
   } catch (error) {
-    console.error("Error al obtener usuario:", error);
+    logger.error("Error al obtener usuario:", error);
     res.status(500).json({
       success: false,
       message: "Error al obtener usuario",
@@ -168,7 +169,7 @@ const updateUser = async (req, res) => {
       message: "Usuario actualizado exitosamente",
     });
   } catch (error) {
-    console.error("Error al actualizar usuario:", error);
+    logger.error("Error al actualizar usuario:", error);
     res.status(500).json({
       success: false,
       message: "Error al actualizar usuario",
@@ -208,7 +209,7 @@ const deleteUser = async (req, res) => {
       message: "Usuario eliminado exitosamente",
     });
   } catch (error) {
-    console.error("Error al eliminar usuario:", error);
+    logger.error("Error al eliminar usuario:", error);
     res.status(500).json({
       success: false,
       message: "Error al eliminar usuario",
@@ -254,7 +255,7 @@ const toggleUserStatus = async (req, res) => {
       data: { activo: newStatus },
     });
   } catch (error) {
-    console.error("Error al cambiar estado del usuario:", error);
+    logger.error("Error al cambiar estado del usuario:", error);
     res.status(500).json({
       success: false,
       message: "Error al cambiar estado del usuario",

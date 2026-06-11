@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const mysql = require('mysql2');
 
 const pool = mysql.createPool({
@@ -72,10 +73,10 @@ const ensureDefaultDepartments = async () => {
         }
 
         if (missing.length > 0) {
-            console.log(`Departamentos base sincronizados: ${missing.length} agregados`);
+            logger.info(`Departamentos base sincronizados: ${missing.length} agregados`);
         }
     } catch (error) {
-        console.error('Error asegurando departamentos base:', error.message);
+        logger.error('Error asegurando departamentos base:', error.message);
         throw error;
     }
 };
@@ -98,10 +99,10 @@ const ensureEmployeeSalaryColumn = async () => {
                  ADD COLUMN sueldo DECIMAL(12,2) NOT NULL DEFAULT 0.00
                  AFTER numero_identificacion`
             );
-            console.log('Columna empleados.sueldo creada automaticamente');
+            logger.info('Columna empleados.sueldo creada automaticamente');
         }
     } catch (error) {
-        console.error('Error asegurando columna empleados.sueldo:', error.message);
+        logger.error('Error asegurando columna empleados.sueldo:', error.message);
         throw error;
     }
 };
@@ -124,10 +125,10 @@ const ensureEmployeeWithdrawalColumn = async () => {
                  ADD COLUMN fecha_retiro DATE NULL
                  AFTER activo`
             );
-            console.log('Columna empleados.fecha_retiro creada automaticamente');
+            logger.info('Columna empleados.fecha_retiro creada automaticamente');
         }
     } catch (error) {
-        console.error('Error asegurando columna empleados.fecha_retiro:', error.message);
+        logger.error('Error asegurando columna empleados.fecha_retiro:', error.message);
         throw error;
     }
 };
@@ -227,7 +228,7 @@ const ensurePayrollSupportTables = async () => {
                     caja_compensacion_pct
                 ) VALUES (25.00, 75.00, 100.00, 150.00, 140606.00, 3501810.00, 47.00, 4.000, 8.500, 4.000, 12.000, 0.522, 2.000, 3.000, 4.000)
             `);
-            console.log('Parametrizacion base de nomina inicializada');
+            logger.info('Parametrizacion base de nomina inicializada');
         }
 
         const dbName = process.env.DB_NAME || 'sistema_nomina';
@@ -246,7 +247,7 @@ const ensurePayrollSupportTables = async () => {
                  ADD COLUMN tope_subsidio_transporte DECIMAL(12,2) NOT NULL DEFAULT 3501810.00
                  AFTER subsidio_transporte`
             );
-            console.log('Columna parametros_nomina.tope_subsidio_transporte creada automaticamente');
+            logger.info('Columna parametros_nomina.tope_subsidio_transporte creada automaticamente');
         }
 
         const [senaColumn] = await promisePool.query(
@@ -265,12 +266,12 @@ const ensurePayrollSupportTables = async () => {
                  ADD COLUMN icbf_pct DECIMAL(5,3) NOT NULL DEFAULT 3.000 AFTER sena_pct,
                  ADD COLUMN caja_compensacion_pct DECIMAL(5,3) NOT NULL DEFAULT 4.000 AFTER icbf_pct`
             );
-            console.log('Columnas de parafiscales creadas automaticamente');
+            logger.info('Columnas de parafiscales creadas automaticamente');
         }
 
-        console.log('Tablas de soporte de nomina (horas extra, reportes y parametros) verificadas');
+        logger.info('Tablas de soporte de nomina (horas extra, reportes y parametros) verificadas');
     } catch (error) {
-        console.error('Error asegurando tablas de soporte de nomina:', error.message);
+        logger.error('Error asegurando tablas de soporte de nomina:', error.message);
         throw error;
     }
 };
@@ -344,9 +345,9 @@ const ensurePrestacionesLiquidacionTables = async () => {
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci
         `);
 
-        console.log('Tablas de prestaciones sociales y liquidacion verificadas');
+        logger.info('Tablas de prestaciones sociales y liquidacion verificadas');
     } catch (error) {
-        console.error('Error asegurando tablas de prestaciones/liquidacion:', error.message);
+        logger.error('Error asegurando tablas de prestaciones/liquidacion:', error.message);
         throw error;
     }
 };
@@ -354,11 +355,11 @@ const ensurePrestacionesLiquidacionTables = async () => {
 const testConnection = async () => {
     try {
         await promisePool.query('SELECT 1 + 1 AS resultado');
-        console.log('Conexion a MySQL exitosa');
-        console.log('Base de datos:', process.env.DB_NAME);
+        logger.info('Conexion a MySQL exitosa');
+        logger.info('Base de datos:', process.env.DB_NAME);
         return true;
     } catch (error) {
-        console.error('Error al conectar a MySQL:', error.message);
+        logger.error('Error al conectar a MySQL:', error.message);
         return false;
     }
 };
@@ -381,10 +382,10 @@ const ensureRehiringParameters = async () => {
                  ADD COLUMN meses_espera_recontratacion INT NOT NULL DEFAULT 0,
                  ADD COLUMN dias_espera_recontratacion INT NOT NULL DEFAULT 0`
             );
-            console.log('Columnas de espera de recontratacion creadas automaticamente');
+            logger.info('Columnas de espera de recontratacion creadas automaticamente');
         }
     } catch (error) {
-        console.error('Error asegurando columnas de espera de recontratacion:', error.message);
+        logger.error('Error asegurando columnas de espera de recontratacion:', error.message);
         throw error;
     }
 };
@@ -407,10 +408,10 @@ const ensureJornadaLaboralColumn = async () => {
          ADD COLUMN jornada_laboral ENUM('LUNES_VIERNES','LUNES_SABADO') NOT NULL DEFAULT 'LUNES_VIERNES'
          AFTER sueldo`
       );
-      console.log('Columna empleados.jornada_laboral creada automaticamente');
+      logger.info('Columna empleados.jornada_laboral creada automaticamente');
     }
   } catch (error) {
-    console.error('Error asegurando columna empleados.jornada_laboral:', error.message);
+    logger.error('Error asegurando columna empleados.jornada_laboral:', error.message);
     throw error;
   }
 };
@@ -432,10 +433,10 @@ const ensureGlobalJornadaLaboralColumn = async () => {
         `ALTER TABLE parametros_nomina
          ADD COLUMN jornada_laboral_defecto ENUM('LUNES_VIERNES','LUNES_SABADO') NOT NULL DEFAULT 'LUNES_VIERNES'`
       );
-      console.log('Columna parametros_nomina.jornada_laboral_defecto creada automaticamente');
+      logger.info('Columna parametros_nomina.jornada_laboral_defecto creada automaticamente');
     }
   } catch (error) {
-    console.error('Error asegurando columna parametros_nomina.jornada_laboral_defecto:', error.message);
+    logger.error('Error asegurando columna parametros_nomina.jornada_laboral_defecto:', error.message);
     throw error;
   }
 };
@@ -457,10 +458,10 @@ const ensureNominaStatusColumn = async () => {
                 `ALTER TABLE nomina
                  ADD COLUMN estado ENUM('PAGADA', 'ANULADA') NOT NULL DEFAULT 'PAGADA'`
             );
-            console.log('Columna nomina.estado creada automaticamente');
+            logger.info('Columna nomina.estado creada automaticamente');
         }
     } catch (error) {
-        console.error('Error asegurando columna nomina.estado:', error.message);
+        logger.error('Error asegurando columna nomina.estado:', error.message);
         throw error;
     }
 };

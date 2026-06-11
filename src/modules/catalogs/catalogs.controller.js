@@ -1,3 +1,4 @@
+const logger = require('../../utils/logger');
 const { fetchCatalogList } = require("./catalogs.helpers");
 
 // Obtiene el catalogo de cargos para poblar selects del frontend.
@@ -15,7 +16,7 @@ const getAllCargos = async (req, res) => {
       count: result.count,
     });
   } catch (error) {
-    console.error("Error al obtener cargos:", error);
+    logger.error("Error al obtener cargos:", error);
     res.status(500).json({
       success: false,
       message: "Error al obtener cargos",
@@ -38,7 +39,7 @@ const getAllDepartamentos = async (req, res) => {
       count: result.count,
     });
   } catch (error) {
-    console.error("Error al obtener departamentos:", error);
+    logger.error("Error al obtener departamentos:", error);
     res.status(500).json({
       success: false,
       message: "Error al obtener departamentos",
@@ -61,7 +62,7 @@ const getAllRoles = async (req, res) => {
       count: result.count,
     });
   } catch (error) {
-    console.error("Error al obtener roles:", error);
+    logger.error("Error al obtener roles:", error);
     res.status(500).json({
       success: false,
       message: "Error al obtener roles",

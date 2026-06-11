@@ -172,13 +172,22 @@ const validateDate = (date) => {
     return { isValid: false, error: 'Fecha requerida' };
   }
 
-  const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
-  if (!dateRegex.test(date)) {
+  const dateRegex = /^(\d{4})-(\d{2})-(\d{2})$/;
+  const match = date.match(dateRegex);
+  if (!match) {
     return { isValid: false, error: 'Formato de fecha inválido (use YYYY-MM-DD)' };
   }
 
-  const dateObj = new Date(date);
-  if (isNaN(dateObj.getTime())) {
+  const year = parseInt(match[1], 10);
+  const month = parseInt(match[2], 10);
+  const day = parseInt(match[3], 10);
+
+  const dateObj = new Date(year, month - 1, day);
+  if (
+    dateObj.getFullYear() !== year ||
+    dateObj.getMonth() !== month - 1 ||
+    dateObj.getDate() !== day
+  ) {
     return { isValid: false, error: 'Fecha inválida' };
   }
 

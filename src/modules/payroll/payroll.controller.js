@@ -1,3 +1,4 @@
+const logger = require('../../utils/logger');
 const { pool } = require('../../config/database');
 const { generatePayrollPdfBuffer } = require('./payroll-pdf.service');
 const { generatePayrollReportExcelBuffer } = require('./payroll-report-excel.service');
@@ -63,7 +64,7 @@ const parsePayrollDate = (value) => {
 
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) {
-    return parsed;
+    return new Date(NaN);
   }
 
   return new Date(Date.UTC(parsed.getUTCFullYear(), parsed.getUTCMonth(), parsed.getUTCDate()));
@@ -172,7 +173,7 @@ const getPayrollParameters = async (req, res) => {
       data: mapPayrollParametersRow(row)
     });
   } catch (error) {
-    console.error('Error obteniendo parametros de nomina:', error.message);
+    logger.error('Error obteniendo parametros de nomina:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error obteniendo parametros de nomina'
@@ -391,7 +392,7 @@ const updatePayrollParameters = async (req, res) => {
       data: mapPayrollParametersRow(savedRows[0])
     });
   } catch (error) {
-    console.error('Error actualizando parametros de nomina:', error.message);
+    logger.error('Error actualizando parametros de nomina:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error actualizando parametros de nomina'
@@ -635,7 +636,7 @@ const createPayroll = async (req, res) => {
     await connection.commit();
 
     calcularPrestacionesEmpleado(id_empleado, anio, mes, salarioBase).catch((err) => {
-      console.error('Error acumulando prestaciones post-nomina:', err.message);
+      logger.error('Error acumulando prestaciones post-nomina:', err.message);
     });
 
     const [savedPayrollRows] = await connection.query(
@@ -656,7 +657,7 @@ const createPayroll = async (req, res) => {
     });
   } catch (error) {
     await connection.rollback();
-    console.error('Error creando nomina:', error.message);
+    logger.error('Error creando nomina:', error.message);
 
     return res.status(500).json({
       success: false,
@@ -831,7 +832,7 @@ const deletePayrollsByEmployee = async (req, res) => {
     });
   } catch (error) {
     await connection.rollback();
-    console.error('Error eliminando nominas por empleado:', error.message);
+    logger.error('Error eliminando nominas por empleado:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error eliminando nominas del empleado'
@@ -885,7 +886,7 @@ const getPayrollNoveltiesPreview = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error obteniendo novedades de nomina:', error.message);
+    logger.error('Error obteniendo novedades de nomina:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error obteniendo las novedades de nomina'
@@ -955,7 +956,7 @@ const getPayrollReport = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error obteniendo reporte de nomina:', error.message);
+    logger.error('Error obteniendo reporte de nomina:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error obteniendo el reporte de nomina'
@@ -1216,7 +1217,7 @@ const downloadPayrollReportExcel = async (req, res) => {
 
     return res.send(excelBuffer);
   } catch (error) {
-    console.error('Error generando Excel de reporte de nomina:', error.message);
+    logger.error('Error generando Excel de reporte de nomina:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error generando el Excel del reporte de nomina'
@@ -1261,7 +1262,7 @@ const downloadPayrollReportPdf = async (req, res) => {
 
     return res.send(pdfBuffer);
   } catch (error) {
-    console.error('Error generando PDF de reporte de nomina:', error.message);
+    logger.error('Error generando PDF de reporte de nomina:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error generando el PDF del reporte de nomina'
@@ -1357,7 +1358,7 @@ const downloadPayrollPdf = async (req, res) => {
 
     return res.send(pdfBuffer);
   } catch (error) {
-    console.error('Error generando PDF de nomina:', error.message);
+    logger.error('Error generando PDF de nomina:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error generando el PDF de nomina'
@@ -1431,7 +1432,7 @@ const getPayrollById = async (req, res) => {
       }
     });
   } catch (error) {
-    console.error('Error obteniendo nomina por ID:', error.message);
+    logger.error('Error obteniendo nomina por ID:', error.message);
     return res.status(500).json({
       success: false,
       message: 'Error obteniendo la nomina'

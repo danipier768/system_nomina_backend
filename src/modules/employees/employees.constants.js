@@ -1,6 +1,6 @@
 // Valores por defecto usados en el modulo de empleados.
 const DEFAULT_EMPLOYEES_PAGE = 1;
-const DEFAULT_EMPLOYEES_LIMIT = 900;
+const DEFAULT_EMPLOYEES_LIMIT = 50;
 const EMPLOYEE_SEARCH_LIMIT = 20;
 const DEFAULT_VACATION_DAYS = 15;
 

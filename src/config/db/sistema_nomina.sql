@@ -171,8 +171,9 @@ CREATE TABLE solicitudes_laborales (
 CREATE INDEX idx_solicitudes_estado_empleado_fechas
   ON solicitudes_laborales (id_empleado, estado, fecha_inicio, fecha_fin);
 
-CREATE INDEX idx_solicitudes_pendiente_liquidacion
-  ON solicitudes_laborales (pendiente_liquidacion, id_empleado);
+-- Nota: columna pendiente_liquidacion fue eliminada del diseño actual
+-- CREATE INDEX idx_solicitudes_pendiente_liquidacion
+--   ON solicitudes_laborales (pendiente_liquidacion, id_empleado);
 
 CREATE INDEX idx_solicitudes_tipo_estado_fecha
   ON solicitudes_laborales (tipo, estado, fecha_solicitud);
@@ -377,11 +378,11 @@ INSERT INTO reporte_nomina_mensual
 (anio, mes, total_nominas, total_devengado, total_deducciones, total_pagado) 
 VALUES
 (2026, 4, 1, 1499095.00, 100000.00, 1399095.00);
-
 -- =====================
 -- TOKENS
 -- =====================
+
 INSERT INTO password_reset_tokens 
 (id_usuario, token, expira_en, usado) 
 VALUES
-(1, 3, '220106', '2026-04-09 19:30:31', 1);
+(1, '3', '2026-04-09 19:30:31', 1);

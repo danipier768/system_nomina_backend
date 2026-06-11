@@ -1,3 +1,4 @@
+const logger = require('../utils/logger');
 const sgMail = require('@sendgrid/mail');
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
@@ -7,18 +8,16 @@ const FROM_NAME = 'Sistema de Nómina';
 
 const verifyConnection = async () => {
     try {
-        const [response] = await sgMail.send({
-            to: FROM_EMAIL,
-            from: { email: FROM_EMAIL, name: FROM_NAME },
-            subject: '✅ Prueba de conexión - Sistema de Nómina',
-            text: 'Conexión con SendGrid verificada exitosamente.',
+        const stats = await sgMail.request({
+            method: 'GET',
+            url: '/v3/user/credits'
         });
-        console.log('✅ Servidor de email (SendGrid) conectado y listo');
+        logger.info('✅ Servidor de email (SendGrid) conectado y listo');
         return true;
     } catch (error) {
-        console.error('❌ Error al conectar con SendGrid:', error.message);
+        logger.error('❌ Error al conectar con SendGrid:', error.message);
         if (error.response) {
-            console.error('Detalles:', error.response.body);
+            logger.error('Detalles:', error.response.body);
         }
         return false;
     }
@@ -143,15 +142,15 @@ const sendPasswordResetEmail = async (to, username, token) => {
         };
 
         const [response] = await sgMail.send(msg);
-        console.log('Email enviado:', response.statusCode);
+        logger.info('Email enviado:', response.statusCode);
         return {
             success: true,
             messageId: response.headers['x-message-id'],
         };
     } catch (error) {
-        console.error('Error al enviar email:', error.message);
+        logger.error('Error al enviar email:', error.message);
         if (error.response) {
-            console.error('Detalles:', error.response.body);
+            logger.error('Detalles:', error.response.body);
         }
         return {
             success: false,
@@ -178,12 +177,12 @@ const sendWelcomeEmail = async (to, username) => {
         };
 
         const [response] = await sgMail.send(msg);
-        console.log('Email de bienvenida enviado:', response.statusCode);
+        logger.info('Email de bienvenida enviado:', response.statusCode);
         return { success: true };
     } catch (error) {
-        console.error('Error al enviar email de bienvenida:', error);
+        logger.error('Error al enviar email de bienvenida:', error);
         if (error.response) {
-            console.error('Detalles:', error.response.body);
+            logger.error('Detalles:', error.response.body);
         }
         return { success: false, error: error.message };
     }
